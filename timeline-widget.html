@@ -1,0 +1,865 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Timeline Widget</title>
+  <link rel="stylesheet" href="https://unpkg.com/vis-timeline/styles/vis-timeline-graph2d.min.css">
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --fg: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --accent: #2563eb;
+      --error: #b91c1c;
+      --axis-bg: #e0f2fe;
+      --axis-border: #60a5fa;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Inter, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.4;
+    }
+
+    .widget {
+      width: min(100%, 1100px);
+      margin: 1rem auto;
+      padding: 1rem;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--card);
+      box-shadow: 0 10px 30px rgba(2, 6, 23, 0.05);
+    }
+
+    .widget-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 0.85rem;
+    }
+
+    .widget-title {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .button {
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--fg);
+      border-radius: 10px;
+      padding: 0.45rem 0.75rem;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.2s ease, border-color 0.2s ease;
+    }
+
+    .button:hover {
+      border-color: #cbd5e1;
+      background: #f8fafc;
+    }
+
+    .status {
+      min-height: 2.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin: 0.2rem 0 0.8rem;
+    }
+
+    .status.error {
+      color: var(--error);
+    }
+
+    .spinner {
+      width: 1rem;
+      height: 1rem;
+      border: 2px solid #cbd5e1;
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex: 0 0 auto;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .timeline-shell {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    .timeline-top-shell {
+      border-bottom: 0;
+      border-bottom-left-radius: 0;
+      border-bottom-right-radius: 0;
+    }
+
+    .timeline-bottom-shell {
+      border-top: 0;
+      border-top-left-radius: 0;
+      border-top-right-radius: 0;
+      background: #f8fafc;
+    }
+
+    #timelineTop {
+      width: 100%;
+    }
+
+    #timelineBottom {
+      width: 100%;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    div.vis-time-axis.vis-foreground {
+      background: var(--axis-bg);
+      border-top: 1px solid var(--axis-border);
+      border-bottom: 1px solid var(--axis-border);
+      height: 20px;
+      font-size: 10px;
+    }
+
+    /*.vis-time-axis {*/
+    /*  background: transparent;*/
+    /*}*/
+
+    .vis-panel.vis-top,
+    .vis-panel.vis-bottom {
+      border-color: var(--border) !important;
+      background: #fff;
+    }
+
+    .vis-item.vis-range {
+      border-color: #94a3b8;
+      background: #e2e8f0;
+      color: #0f172a;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      line-height: 1.1;
+      min-height: 14px;
+    }
+
+    .vis-item.vis-range .vis-item-content {
+      padding: 1px 6px;
+      line-height: 1.1;
+    }
+
+    .vis-item.paradigm-range {
+      background: rgba(37, 99, 235, 0.12);
+      border-color: rgba(37, 99, 235, 0.4);
+      color: #1e3a8a;
+    }
+
+    .vis-item.trend-range.trend-color-0 {
+      background: #dbeafe;
+      border-color: #60a5fa;
+      color: #1e3a8a;
+    }
+
+    .vis-item.trend-range.trend-color-1 {
+      background: #dcfce7;
+      border-color: #4ade80;
+      color: #166534;
+    }
+
+    .vis-item.trend-range.trend-color-2 {
+      background: #fee2e2;
+      border-color: #f87171;
+      color: #991b1b;
+    }
+
+    .vis-item.trend-range.trend-color-3 {
+      background: #fef3c7;
+      border-color: #fbbf24;
+      color: #92400e;
+    }
+
+    .vis-item.trend-range.trend-color-4 {
+      background: #ede9fe;
+      border-color: #a78bfa;
+      color: #5b21b6;
+    }
+
+    .vis-item.trend-range.trend-color-5 {
+      background: #cffafe;
+      border-color: #22d3ee;
+      color: #155e75;
+    }
+
+    .vis-item.trend-range.trend-color-6 {
+      background: #fce7f3;
+      border-color: #f472b6;
+      color: #9d174d;
+    }
+
+    .vis-item.trend-range.trend-color-7 {
+      background: #e2e8f0;
+      border-color: #94a3b8;
+      color: #334155;
+    }
+
+    .vis-item.vis-background {
+      background: rgba(59, 130, 246, 0.1);
+      border-color: rgba(37, 99, 235, 0.25);
+      color: #1e3a8a;
+    }
+
+    .vis-item.vis-point {
+      background: #2563eb;
+      border-color: #1d4ed8;
+      min-height: 14px;
+      height: 14px;
+      width: 14px;
+      border-width: 2px;
+      border-radius: 999px;
+    }
+
+    .vis-item.vis-point .vis-item-content {
+      font-size: 0.72rem;
+      line-height: 1.1;
+      padding: 1px 6px;
+      white-space: nowrap;
+    }
+
+    /* Bottom timeline only displays paradigm ranges; axis stays on top timeline. */
+    .timeline-bottom-shell .vis-time-axis,
+    .timeline-bottom-shell .vis-panel.vis-top,
+    .timeline-bottom-shell .vis-panel.vis-bottom {
+      display: none;
+    }
+
+    @media (max-width: 768px) {
+      .widget {
+        margin: 0.6rem;
+        border-radius: 12px;
+      }
+
+      .timeline-top-shell,
+      #timelineTop {
+        min-height: 0;
+      }
+
+      .timeline-bottom-shell,
+      #timelineBottom {
+        min-height: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <section class="widget" id="widgetRoot">
+    <div class="widget-header">
+      <h2 class="widget-title">Timeline Demo</h2>
+      <div class="controls">
+        <button class="button" id="reloadBtn" type="button">Reload Data</button>
+      </div>
+    </div>
+
+    <div id="status" class="status" aria-live="polite">
+      <span class="spinner" id="spinner"></span>
+      <span id="statusText">Preparing timeline...</span>
+    </div>
+
+    <div class="timeline-shell timeline-top-shell hidden" id="timelineShell">
+      <div id="timelineTop"></div>
+    </div>
+    <div class="timeline-shell timeline-bottom-shell hidden" id="paradigmShell">
+      <div id="timelineBottom"></div>
+    </div>
+  </section>
+
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.5.3/papaparse.min.js"></script>
+  <script src="https://unpkg.com/vis-timeline/standalone/umd/vis-timeline-graph2d.min.js"></script>
+  <script>
+    // Published base URL (File -> Share -> Publish to web -> Comma-separated values).
+    const PUBLISHED_BASE = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTbmQV5Ao_KYTM4fsZWMwWDE8nwfozZWmXSCgVQX3fc3ltfjMJwB5voQlDATuAlVimdiknIGrL1L0Ij/pub";
+    const SHEET_GIDS = {
+      timeline: "0",
+      master: "1583828384"
+    };
+
+    // Keep empty when using published CSV URLs directly.
+    const CORS_PROXY = "";
+     const SHEET_NAMES = {
+       timeline: "Timeline",
+       master: "Master"
+     };
+
+    const DEFAULT_GROUP_ID = "default";
+    const PARADIGM_GROUP_ID = "paradigms";
+    const TOP_TIMELINE_HEIGHT = 360;
+    const BOTTOM_TIMELINE_HEIGHT = 100;
+    const EVENT_TITLE_MAX = 10;
+    const REQUIRED_HEADERS = {
+      timeline: [
+        "Type",
+        "Title",
+        "Start Year",
+        "Start Month",
+        "Start Day",
+        "End Year",
+        "End Month",
+        "End Day"
+      ],
+      master: [
+        "Start Year",
+        "Start Month",
+        "Start Day",
+        "End Year",
+        "End Month",
+        "End Day",
+        "Trend",
+        "Paradigm",
+        "Description"
+      ]
+    };
+
+    let trendTimelineInstance = null;
+    let paradigmTimelineInstance = null;
+
+    const el = {
+      timelineTop: document.getElementById("timelineTop"),
+      timelineBottom: document.getElementById("timelineBottom"),
+      timelineShell: document.getElementById("timelineShell"),
+      paradigmShell: document.getElementById("paradigmShell"),
+      status: document.getElementById("status"),
+      statusText: document.getElementById("statusText"),
+      spinner: document.getElementById("spinner"),
+      reloadBtn: document.getElementById("reloadBtn")
+    };
+
+    function setLoadingState(message) {
+      el.status.classList.remove("hidden", "error");
+      el.spinner.classList.remove("hidden");
+      el.statusText.textContent = message;
+      el.timelineShell.classList.add("hidden");
+      el.paradigmShell.classList.add("hidden");
+    }
+
+    function setReadyState(message) {
+      el.status.classList.remove("error");
+      el.spinner.classList.add("hidden");
+      el.statusText.textContent = message;
+      el.timelineShell.classList.remove("hidden");
+      el.paradigmShell.classList.remove("hidden");
+    }
+
+    function setErrorState(message) {
+      el.status.classList.remove("hidden");
+      el.status.classList.add("error");
+      el.spinner.classList.add("hidden");
+      el.statusText.textContent = message;
+      el.timelineShell.classList.add("hidden");
+      el.paradigmShell.classList.add("hidden");
+    }
+
+    function csvUrl(sheetName) {
+      let gid;
+
+      if (sheetName === SHEET_NAMES.timeline) {
+        gid = SHEET_GIDS.timeline;
+      } else if (sheetName === SHEET_NAMES.master) {
+        gid = SHEET_GIDS.master;
+      } else {
+        throw new Error("Unknown sheet name: " + sheetName);
+      }
+
+      if (!gid) {
+        throw new Error("Missing gid for sheet: " + sheetName);
+      }
+
+      const separator = PUBLISHED_BASE.includes("?") ? "&" : "?";
+      return PUBLISHED_BASE + separator + "single=true&gid=" + encodeURIComponent(gid) + "&output=csv";
+    }
+
+    function buildRequestUrl(rawUrl) {
+      if (!CORS_PROXY) {
+        return rawUrl;
+      }
+
+      const proxyBase = String(CORS_PROXY).replace(/\/+$/, "");
+      return proxyBase + "/?url=" + encodeURIComponent(rawUrl);
+    }
+
+    function parseCsvText(csvText, sheetName, sheetKind) {
+       return new Promise((resolve, reject) => {
+         Papa.parse(csvText, {
+           header: true,
+           skipEmptyLines: true,
+           worker: true,
+           complete: (result) => {
+             if (result.errors && result.errors.length > 0) {
+               reject(new Error("CSV parse error in sheet \"" + sheetName + "\": " + result.errors[0].message));
+               return;
+             }
+
+            try {
+              assertRequiredHeaders(sheetName, sheetKind, result.meta && result.meta.fields ? result.meta.fields : []);
+            } catch (validationError) {
+              reject(validationError);
+              return;
+            }
+
+             resolve(result.data || []);
+           },
+           error: (err) => reject(new Error("CSV parse failed in sheet \"" + sheetName + "\": " + err.message))
+         });
+       });
+     }
+
+    function assertRequiredHeaders(sheetName, sheetKind, fields) {
+      const expected = REQUIRED_HEADERS[sheetKind] || [];
+      const available = new Set((fields || []).map((name) => String(name == null ? "" : name).trim()));
+      const missing = expected.filter((header) => !available.has(header));
+
+      if (missing.length > 0) {
+        throw new Error(
+          "Sheet \"" + sheetName + "\" does not match expected " + sheetKind +
+          " schema. Missing columns: " + missing.join(", ") +
+          ". Check the sheet name and header row."
+        );
+      }
+    }
+
+    async function fetchSheetRows(sheetName, sheetKind) {
+      const targetUrl = csvUrl(sheetName);
+      const requestUrl = buildRequestUrl(targetUrl);
+      let response;
+
+      try {
+        response = await fetch(requestUrl, { cache: "no-store" });
+      } catch (error) {
+        throw new Error(
+          "Network/CORS error for sheet \"" + sheetName + "\". " +
+          "If testing locally, run with http(s) and set CORS_PROXY."
+        );
+      }
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch sheet \"" + sheetName + "\" (" + response.status + ")");
+      }
+
+      const csvText = await response.text();
+      return parseCsvText(csvText, sheetName, sheetKind);
+    }
+
+    function toInt(value) {
+      const normalized = String(value == null ? "" : value).trim();
+      if (normalized === "") {
+        return null;
+      }
+      const parsed = parseInt(normalized, 10);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    function parseStartDate(row) {
+      const year = toInt(row["Start Year"]);
+      if (year === null) {
+        return null;
+      }
+
+      const month = toInt(row["Start Month"]);
+      const day = toInt(row["Start Day"]);
+      return new Date(year, month === null ? 0 : month, day === null ? 1 : day);
+    }
+
+    function parseEndDate(row) {
+      const year = toInt(row["End Year"]);
+      if (year === null) {
+        return new Date();
+      }
+
+      const month = toInt(row["End Month"]);
+      const day = toInt(row["End Day"]);
+      return new Date(year, month === null ? 0 : month, day === null ? 1 : day);
+    }
+
+    function normalizeType(value) {
+      return String(value == null ? "" : value).trim().toLowerCase();
+    }
+
+    function normalizeSubgroupId(value) {
+      return String(value == null ? "" : value).trim().toLowerCase();
+    }
+
+    function hashString(value) {
+      const text = String(value == null ? "" : value);
+      let hash = 0;
+      for (let i = 0; i < text.length; i += 1) {
+        hash = ((hash << 5) - hash) + text.charCodeAt(i);
+        hash |= 0;
+      }
+      return hash;
+    }
+
+    function buildEventContent(description) {
+      const text = String(description == null ? "" : description);
+
+      if (description.length <= EVENT_TITLE_MAX) {
+        return text;
+      }
+
+      return text.slice(0, EVENT_TITLE_MAX) + "...";
+    }
+
+    function dedupeStrings(values) {
+      const seen = new Set();
+      const result = [];
+
+      for (let i = 0; i < values.length; i += 1) {
+        const value = String(values[i] == null ? "" : values[i]).trim();
+        if (!value || seen.has(value)) {
+          continue;
+        }
+        seen.add(value);
+        result.push(value);
+      }
+
+      return result;
+    }
+
+    function createGroupWithSubgroups(subgroupIds) {
+      const subgroupStack = {};
+      for (let i = 0; i < subgroupIds.length; i += 1) {
+        subgroupStack[subgroupIds[i]] = false;
+      }
+
+      return {
+        id: DEFAULT_GROUP_ID,
+        content: "",
+        subgroupStack
+      };
+    }
+
+    function nextTick() {
+      return new Promise((resolve) => setTimeout(resolve, 0));
+    }
+
+    function buildTimelineData(timelineRows, masterRows) {
+      const now = new Date();
+      let timelineStart = null;
+      let timelineEnd = null;
+      const trendTitles = [];
+      const trendSubgroups = new Set();
+      const trendItems = [];
+      const paradigmItems = [];
+      let idCounter = 1;
+
+      for (let i = 0; i < timelineRows.length; i += 1) {
+        const row = timelineRows[i];
+        const type = normalizeType(row.Type);
+        const title = String(row.Title == null ? "" : row.Title).trim();
+
+        if (type === "timeline") {
+          const start = parseStartDate(row);
+          const end = parseEndDate(row);
+
+          if (start && (!timelineStart || start < timelineStart)) {
+            timelineStart = start;
+          }
+          if (end && (!timelineEnd || end > timelineEnd)) {
+            timelineEnd = end;
+          }
+          continue;
+        }
+
+        if (type === "trend") {
+          if (!title) {
+            continue;
+          }
+
+          const subgroup = normalizeSubgroupId(title);
+          if (!subgroup) {
+            continue;
+          }
+
+          trendTitles.push(title);
+          trendSubgroups.add(subgroup);
+
+          const start = parseStartDate(row);
+          const end = parseEndDate(row);
+
+          if (!start) {
+            continue;
+          }
+
+          trendItems.push({
+            id: "trend-" + idCounter++,
+            group: DEFAULT_GROUP_ID,
+            subgroup,
+            type: "range",
+            className: "trend-range trend-color-" + (Math.abs(hashString(subgroup)) % 8),
+            start,
+            end,
+            content: title
+          });
+          continue;
+        }
+
+        if (type === "paradigm") {
+          const start = parseStartDate(row);
+          const end = parseEndDate(row);
+          if (!start) {
+            continue;
+          }
+
+          paradigmItems.push({
+            id: "paradigm-" + idCounter++,
+            group: PARADIGM_GROUP_ID,
+            type: "range",
+            className: "paradigm-range",
+            start,
+            end,
+            content: title || "Paradigm"
+          });
+        }
+      }
+
+      for (let i = 0; i < masterRows.length; i += 1) {
+        const row = masterRows[i];
+        const subgroup = normalizeSubgroupId(row.Trend);
+        const start = parseStartDate(row);
+        const description = String(row.Description == null ? "" : row.Description).trim();
+
+        if (!subgroup || !start || !description) {
+          continue;
+        }
+
+        trendSubgroups.add(subgroup);
+
+        trendItems.push({
+          id: "event-" + idCounter++,
+          group: DEFAULT_GROUP_ID,
+          subgroup,
+          type: "point",
+          start,
+          // content: buildEventContent(description),
+          title: description
+        });
+      }
+
+      const subgroupIds = Array.from(trendSubgroups);
+      const trendGroups = [createGroupWithSubgroups(subgroupIds)];
+      const paradigmGroups = [{ id: PARADIGM_GROUP_ID, content: "" }];
+
+      return {
+        trendGroups,
+        paradigmGroups,
+        trendItems,
+        paradigmItems,
+        options: {
+          stack: false,
+          stackSubgroups: true,
+          start: timelineStart || new Date(now.getFullYear() - 100, 0, 1),
+          end: timelineEnd || now
+        },
+        masterRowCount: masterRows.length
+       };
+     }
+
+    function buildBounds(baseOptions) {
+      const startYear = baseOptions && baseOptions.start instanceof Date
+        ? baseOptions.start.getFullYear()
+        : null;
+      const endYear = baseOptions && baseOptions.end instanceof Date
+        ? baseOptions.end.getFullYear()
+        : null;
+
+      return {
+        min: startYear === null ? undefined : new Date(startYear, 0, 1),
+        max: endYear === null ? undefined : new Date(endYear, 11, 31)
+      };
+    }
+
+    function buildTopOptions(baseOptions, timeAxisStep) {
+      const bounds = buildBounds(baseOptions);
+       return {
+         ...baseOptions,
+         ...bounds,
+         height: TOP_TIMELINE_HEIGHT + "px",
+         zoomMin: 1000 * 60 * 60 * 24 * 365,
+         orientation: "bottom",
+         verticalScroll: true,
+         margin: {
+           item: {
+             horizontal: 8,
+             vertical: 2
+           },
+           axis: 14
+         },
+         // timeAxis: {
+         //   scale: "year",
+         //   step: timeAxisStep
+         // },
+         groupHeightMode: "fixed",
+         showCurrentTime: false,
+       };
+    }
+
+    function buildBottomOptions(baseOptions) {
+      const bounds = buildBounds(baseOptions);
+      return {
+        ...baseOptions,
+        ...bounds,
+        height: BOTTOM_TIMELINE_HEIGHT + "px",
+        orientation: "top",
+        stack: true,
+        verticalScroll: true,
+        zoomable: true,
+        moveable: true,
+        selectable: true,
+        groupHeightMode: "fixed",
+        margin: {
+          item: {
+            horizontal: 8,
+            vertical: 2
+          },
+          axis: 0
+        },
+        showCurrentTime: false,
+        // timeAxis: {
+        //   scale: "year",
+        //   step: 1
+        // }
+      };
+    }
+
+    function syncTimelineWindowsBidirectional(first, second) {
+      let isSyncing = false;
+
+      function wire(source, target) {
+        source.on("rangechange", (props) => {
+          if (isSyncing) {
+            return;
+          }
+
+          isSyncing = true;
+          target.setWindow(props.start, props.end, { animation: false });
+          isSyncing = false;
+        });
+      }
+
+      wire(first, second);
+      wire(second, first);
+     }
+
+    function refreshVisibleTimelines() {
+      if (!trendTimelineInstance || !paradigmTimelineInstance) {
+        return;
+      }
+
+      // Timelines are created while containers are hidden; redraw once visible so axis/layout paints correctly.
+      requestAnimationFrame(() => {
+        trendTimelineInstance.redraw();
+        paradigmTimelineInstance.redraw();
+
+        requestAnimationFrame(() => {
+          trendTimelineInstance.redraw();
+          paradigmTimelineInstance.redraw();
+
+          const topWindow = trendTimelineInstance.getWindow();
+          paradigmTimelineInstance.setWindow(topWindow.start, topWindow.end, { animation: false });
+        });
+      });
+    }
+
+    function renderTimeline(data) {
+      const trendItems = new vis.DataSet(data.trendItems);
+      const trendGroups = new vis.DataSet(data.trendGroups);
+      const paradigmItems = new vis.DataSet(data.paradigmItems);
+      const paradigmGroups = new vis.DataSet(data.paradigmGroups);
+
+      if (trendTimelineInstance) {
+        trendTimelineInstance.destroy();
+      }
+      if (paradigmTimelineInstance) {
+        paradigmTimelineInstance.destroy();
+      }
+
+      try {
+        trendTimelineInstance = new vis.Timeline(el.timelineTop, trendItems, trendGroups, buildTopOptions(data.options, 1));
+      } catch (error) {
+        trendTimelineInstance = new vis.Timeline(el.timelineTop, trendItems, trendGroups, buildTopOptions(data.options, 1));
+      }
+
+      paradigmTimelineInstance = new vis.Timeline(
+        el.timelineBottom,
+        paradigmItems,
+        paradigmGroups,
+        buildBottomOptions(data.options)
+      );
+
+      syncTimelineWindowsBidirectional(trendTimelineInstance, paradigmTimelineInstance);
+
+      // Keep the initial viewport aligned after creation.
+      paradigmTimelineInstance.setWindow(data.options.start, data.options.end, { animation: false });
+    }
+
+    async function loadAndRenderTimeline() {
+      setLoadingState("Loading Timeline and Master sheets...");
+
+       try {
+        const [timelineRows, masterRows] = await Promise.all([
+          fetchSheetRows(SHEET_NAMES.timeline, "timeline"),
+          fetchSheetRows(SHEET_NAMES.master, "master")
+        ]);
+
+         await nextTick();
+         setLoadingState("Preparing timeline data...");
+
+        const data = buildTimelineData(timelineRows, masterRows);
+
+         await nextTick();
+         setLoadingState("Rendering timeline...");
+
+          renderTimeline(data);
+
+        setReadyState(
+            "Timeline loaded. Master rows: " + data.masterRowCount +
+            ". Items: " + (data.trendItems.length + data.paradigmItems.length) + "."
+          );
+        refreshVisibleTimelines();
+        } catch (error) {
+          const msg = error && error.message ? error.message : "Unknown error";
+          setErrorState("Unable to load timeline: " + msg);
+          console.error(error);
+        }
+     }
+
+    el.reloadBtn.addEventListener("click", loadAndRenderTimeline);
+
+    loadAndRenderTimeline();
+  </script>
+</body>
+</html>
