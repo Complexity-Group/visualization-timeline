@@ -324,6 +324,7 @@
     const REQUIRED_HEADERS = {
       timeline: [
         "Type",
+        "RowId",
         "Title",
         "Start Year",
         "Start Month",
@@ -549,14 +550,14 @@
       return result;
     }
 
-    function createGroupWithSubgroups(subgroupIds) {
+    function createGroupWithSubgroups(groupId, subgroupIds) {
       const subgroupStack = {};
       for (let i = 0; i < subgroupIds.length; i += 1) {
         subgroupStack[subgroupIds[i]] = false;
       }
 
       return {
-        id: DEFAULT_GROUP_ID,
+        id: groupId,
         content: "",
         subgroupStack
       };
@@ -571,8 +572,10 @@
       let timelineStart = null;
       let timelineEnd = null;
       const trendTitles = [];
+      const trendTitleToSubgroup = {};
       const trendSubgroups = new Set();
       const trendItems = [];
+      const paradigmSubgroups = new Set();
       const paradigmItems = [];
       let idCounter = 1;
 
@@ -599,12 +602,13 @@
             continue;
           }
 
-          const subgroup = normalizeSubgroupId(title);
+          const subgroup = normalizeSubgroupId(row.RowId);
           if (!subgroup) {
             continue;
           }
 
           trendTitles.push(title);
+          trendTitleToSubgroup[normalizeSubgroupId(title)] = subgroup;
           trendSubgroups.add(subgroup);
 
           const start = parseStartDate(row);
@@ -628,15 +632,19 @@
         }
 
         if (type === "paradigm") {
+          const subgroup = normalizeSubgroupId(row.RowId);
           const start = parseStartDate(row);
           const end = parseEndDate(row);
           if (!start) {
             continue;
           }
 
+          paradigmSubgroups.add(subgroup);
+
           paradigmItems.push({
             id: "paradigm-" + idCounter++,
             group: PARADIGM_GROUP_ID,
+            subgroup,
             type: "range",
             className: "paradigm-range",
             start,
@@ -648,7 +656,8 @@
 
       for (let i = 0; i < masterRows.length; i += 1) {
         const row = masterRows[i];
-        const subgroup = normalizeSubgroupId(row.Trend);
+        const trendKey = normalizeSubgroupId(row.Trend);
+        const subgroup = trendTitleToSubgroup[trendKey] || trendKey;
         const start = parseStartDate(row);
         const description = String(row.Description == null ? "" : row.Description).trim();
 
@@ -670,8 +679,9 @@
       }
 
       const subgroupIds = Array.from(trendSubgroups);
-      const trendGroups = [createGroupWithSubgroups(subgroupIds)];
-      const paradigmGroups = [{ id: PARADIGM_GROUP_ID, content: "" }];
+      const trendGroups = [createGroupWithSubgroups(DEFAULT_GROUP_ID, subgroupIds)];
+      const paradigmSubgroupIds = Array.from(paradigmSubgroups);
+      const paradigmGroups = [createGroupWithSubgroups(PARADIGM_GROUP_ID, paradigmSubgroupIds)];
 
       return {
         trendGroups,
@@ -734,7 +744,6 @@
         ...bounds,
         height: BOTTOM_TIMELINE_HEIGHT + "px",
         orientation: "top",
-        stack: true,
         verticalScroll: true,
         zoomable: true,
         moveable: true,
