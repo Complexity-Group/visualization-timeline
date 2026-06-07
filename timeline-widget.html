@@ -480,8 +480,8 @@
       if (normalized === "") {
         return null;
       }
-      const parsed = parseInt(normalized, 10);
-      return Number.isFinite(parsed) ? parsed : null;
+      const timeline = parseInt(normalized, 10);
+      return Number.isFinite(timeline) ? timeline : null;
     }
 
     function parseStartDate(row) {
@@ -534,22 +534,6 @@
       return text.slice(0, EVENT_TITLE_MAX) + "...";
     }
 
-    function dedupeStrings(values) {
-      const seen = new Set();
-      const result = [];
-
-      for (let i = 0; i < values.length; i += 1) {
-        const value = String(values[i] == null ? "" : values[i]).trim();
-        if (!value || seen.has(value)) {
-          continue;
-        }
-        seen.add(value);
-        result.push(value);
-      }
-
-      return result;
-    }
-
     function createGroupWithSubgroups(groupId, subgroupIds) {
       const subgroupStack = {};
       for (let i = 0; i < subgroupIds.length; i += 1) {
@@ -567,97 +551,119 @@
       return new Promise((resolve) => setTimeout(resolve, 0));
     }
 
-    function buildTimelineData(timelineRows, masterRows) {
-      const now = new Date();
-      let timelineStart = null;
-      let timelineEnd = null;
-      const trendTitles = [];
-      const trendTitleToSubgroup = {};
+    function tryUpdateBounds(startDate, endDate, bounds) {
+      if (startDate && (!bounds.start || startDate < bounds.start)) {
+        bounds.start = startDate;
+      }
+      if (endDate && (!bounds.end || endDate > bounds.end)) {
+        bounds.end = endDate;
+      }
+    }
+
+    function addTrendRow(row, titleToSubgroup, subgroups, items, counter) {
+      const title = String(row.Title == null ? "" : row.Title).trim();
+      if (!title) {
+        return counter;
+      }
+
+      const subgroup = normalizeSubgroupId(row.RowId);
+      if (!subgroup) {
+        return counter;
+      }
+
+      const start = parseStartDate(row);
+      if (!start) {
+        return counter;
+      }
+
+      titleToSubgroup[normalizeSubgroupId(title)] = subgroup;
+      subgroups.add(subgroup);
+
+      items.push({
+        id: "trend-" + counter,
+        group: DEFAULT_GROUP_ID,
+        subgroup,
+        type: "range",
+        className: "trend-range trend-color-" + (Math.abs(hashString(subgroup)) % 8),
+        start,
+        end: parseEndDate(row),
+        content: title
+      });
+
+      return counter + 1;
+    }
+
+    function addParadigmRow(row, subgroups, items, counter) {
+      const start = parseStartDate(row);
+      if (!start) {
+        return counter;
+      }
+
+      const title = String(row.Title == null ? "" : row.Title).trim();
+      const subgroup = normalizeSubgroupId(row.RowId);
+      subgroups.add(subgroup);
+
+      items.push({
+        id: "paradigm-" + counter,
+        group: PARADIGM_GROUP_ID,
+        subgroup,
+        type: "range",
+        className: "paradigm-range",
+        start,
+        end: parseEndDate(row),
+        content: title || "Paradigm"
+      });
+
+      return counter + 1;
+    }
+
+    function parseTimelineRows(timelineRows) {
+      const bounds = { start: null, end: null };
+      const titleToSubgroup = {};
       const trendSubgroups = new Set();
       const trendItems = [];
       const paradigmSubgroups = new Set();
       const paradigmItems = [];
-      let idCounter = 1;
+      let trendCounter = 1;
+      let paradigmCounter = 1;
 
       for (let i = 0; i < timelineRows.length; i += 1) {
         const row = timelineRows[i];
         const type = normalizeType(row.Type);
-        const title = String(row.Title == null ? "" : row.Title).trim();
 
-        if (type === "timeline") {
-          const start = parseStartDate(row);
-          const end = parseEndDate(row);
-
-          if (start && (!timelineStart || start < timelineStart)) {
-            timelineStart = start;
-          }
-          if (end && (!timelineEnd || end > timelineEnd)) {
-            timelineEnd = end;
-          }
-          continue;
-        }
-
-        if (type === "trend") {
-          if (!title) {
+        switch (type) {
+          case "timeline":
+            tryUpdateBounds(parseStartDate(row), parseEndDate(row), bounds);
+            break;
+          case "trend":
+            trendCounter = addTrendRow(row, titleToSubgroup, trendSubgroups, trendItems, trendCounter);
+            break;
+          case "paradigm":
+            paradigmCounter = addParadigmRow(row, paradigmSubgroups, paradigmItems, paradigmCounter);
+            break;
+          default:
             continue;
-          }
-
-          const subgroup = normalizeSubgroupId(row.RowId);
-          if (!subgroup) {
-            continue;
-          }
-
-          trendTitles.push(title);
-          trendTitleToSubgroup[normalizeSubgroupId(title)] = subgroup;
-          trendSubgroups.add(subgroup);
-
-          const start = parseStartDate(row);
-          const end = parseEndDate(row);
-
-          if (!start) {
-            continue;
-          }
-
-          trendItems.push({
-            id: "trend-" + idCounter++,
-            group: DEFAULT_GROUP_ID,
-            subgroup,
-            type: "range",
-            className: "trend-range trend-color-" + (Math.abs(hashString(subgroup)) % 8),
-            start,
-            end,
-            content: title
-          });
-          continue;
-        }
-
-        if (type === "paradigm") {
-          const subgroup = normalizeSubgroupId(row.RowId);
-          const start = parseStartDate(row);
-          const end = parseEndDate(row);
-          if (!start) {
-            continue;
-          }
-
-          paradigmSubgroups.add(subgroup);
-
-          paradigmItems.push({
-            id: "paradigm-" + idCounter++,
-            group: PARADIGM_GROUP_ID,
-            subgroup,
-            type: "range",
-            className: "paradigm-range",
-            start,
-            end,
-            content: title || "Paradigm"
-          });
         }
       }
+
+      return {
+        start: bounds.start,
+        end: bounds.end,
+        titleToSubgroup,
+        trendSubgroups,
+        trendItems,
+        paradigmSubgroups,
+        paradigmItems
+      };
+    }
+
+    function parseMasterRows(masterRows, titleToSubgroup, trendSubgroups, trendItems) {
+      let counter = 1;
 
       for (let i = 0; i < masterRows.length; i += 1) {
         const row = masterRows[i];
         const trendKey = normalizeSubgroupId(row.Trend);
-        const subgroup = trendTitleToSubgroup[trendKey] || trendKey;
+        const subgroup = titleToSubgroup[trendKey] || trendKey;
         const start = parseStartDate(row);
         const description = String(row.Description == null ? "" : row.Description).trim();
 
@@ -668,35 +674,37 @@
         trendSubgroups.add(subgroup);
 
         trendItems.push({
-          id: "event-" + idCounter++,
+          id: "event-" + counter++,
           group: DEFAULT_GROUP_ID,
           subgroup,
           type: "point",
           start,
-          // content: buildEventContent(description),
           title: description
         });
       }
+    }
 
-      const subgroupIds = Array.from(trendSubgroups);
-      const trendGroups = [createGroupWithSubgroups(DEFAULT_GROUP_ID, subgroupIds)];
-      const paradigmSubgroupIds = Array.from(paradigmSubgroups);
-      const paradigmGroups = [createGroupWithSubgroups(PARADIGM_GROUP_ID, paradigmSubgroupIds)];
+    function buildTimelineData(timelineRows, masterRows) {
+      const timeline = parseTimelineRows(timelineRows);
+
+      parseMasterRows(masterRows, timeline.titleToSubgroup, timeline.trendSubgroups, timeline.trendItems);
+
+      const now = new Date();
 
       return {
-        trendGroups,
-        paradigmGroups,
-        trendItems,
-        paradigmItems,
+        trendGroups: [createGroupWithSubgroups(DEFAULT_GROUP_ID, Array.from(timeline.trendSubgroups))],
+        paradigmGroups: [createGroupWithSubgroups(PARADIGM_GROUP_ID, Array.from(timeline.paradigmSubgroups))],
+        trendItems: timeline.trendItems,
+        paradigmItems: timeline.paradigmItems,
         options: {
           stack: false,
           stackSubgroups: true,
-          start: timelineStart || new Date(now.getFullYear() - 100, 0, 1),
-          end: timelineEnd || now
+          start: timeline.start || new Date(now.getFullYear() - 100, 0, 1),
+          end: timeline.end || now
         },
         masterRowCount: masterRows.length
-       };
-     }
+      };
+    }
 
     function buildBounds(baseOptions) {
       const startYear = baseOptions && baseOptions.start instanceof Date
