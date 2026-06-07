@@ -845,6 +845,7 @@
 
     async function loadAndRenderTimeline() {
       setLoadingState("Loading Timeline and Master sheets...");
+      const t0 = performance.now();
 
        try {
         const [timelineRows, masterRows] = await Promise.all([
@@ -856,6 +857,7 @@
          setLoadingState("Preparing timeline data...");
 
         const data = buildTimelineData(timelineRows, masterRows);
+        const elapsed = ((performance.now() - t0) / 1000).toFixed(1);
 
          await nextTick();
          setLoadingState("Rendering timeline...");
@@ -863,7 +865,7 @@
           renderTimeline(data);
 
         setReadyState(
-            "Timeline loaded. Master rows: " + data.masterRowCount +
+            "Timeline loaded in " + elapsed + "s. Master rows: " + data.masterRowCount +
             ". Items: " + (data.trendItems.length + data.paradigmItems.length) + "."
           );
         refreshVisibleTimelines();
