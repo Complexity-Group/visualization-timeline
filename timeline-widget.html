@@ -80,6 +80,39 @@
       background: #f8fafc;
     }
 
+    .tabs-bar {
+      display: flex;
+      gap: 0.25rem;
+      background: #f1f5f9;
+      border-radius: 10px;
+      padding: 0.2rem;
+      margin-bottom: 0.85rem;
+    }
+
+    .tab {
+      flex: 1;
+      text-align: center;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      border-radius: 8px;
+      padding: 0.35rem 0.75rem;
+      font-size: 0.82rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.15s ease, color 0.15s ease;
+    }
+
+    .tab:hover {
+      color: var(--fg);
+    }
+
+    .tab.active {
+      background: #fff;
+      color: var(--fg);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
     .status {
       min-height: 2.25rem;
       display: flex;
@@ -286,6 +319,12 @@
       </div>
     </div>
 
+    <div class="tabs-bar" id="tabs" role="tablist">
+      <button class="tab active" data-tab="energy-sources" role="tab" aria-selected="true">Energy Sources</button>
+      <button class="tab" data-tab="energy-uses" role="tab" aria-selected="false">Energy Uses</button>
+      <button class="tab" data-tab="energy-transformations" role="tab" aria-selected="false">Energy Transformations</button>
+    </div>
+
     <div id="status" class="status" aria-live="polite">
       <span class="spinner" id="spinner"></span>
       <span id="statusText">Preparing timeline...</span>
@@ -302,12 +341,25 @@
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.5.3/papaparse.min.js"></script>
   <script src="https://unpkg.com/vis-timeline/standalone/umd/vis-timeline-graph2d.min.js"></script>
   <script>
-    // Published base URL (File -> Share -> Publish to web -> Comma-separated values).
-    const PUBLISHED_BASE = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTbmQV5Ao_KYTM4fsZWMwWDE8nwfozZWmXSCgVQX3fc3ltfjMJwB5voQlDATuAlVimdiknIGrL1L0Ij/pub";
-    const SHEET_GIDS = {
-      timeline: "0",
-      master: "1583828384"
+    const TIMELINE_CONFIGS = {
+      "energy-sources": {
+        label: "Energy Sources",
+        publishedBase: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTbmQV5Ao_KYTM4fsZWMwWDE8nwfozZWmXSCgVQX3fc3ltfjMJwB5voQlDATuAlVimdiknIGrL1L0Ij/pub",
+        sheetGids: { timeline: "0", master: "1583828384" }
+      },
+      "energy-uses": {
+        label: "Energy Uses",
+        publishedBase: "",
+        sheetGids: { timeline: "", master: "" }
+      },
+      "energy-transformations": {
+        label: "Energy Transformations",
+        publishedBase: "",
+        sheetGids: { timeline: "", master: "" }
+      }
     };
+
+    const ACTIVE_TAB_KEY = "energy-sources";
 
     // Keep empty when using published CSV URLs directly.
     const CORS_PROXY = "";
@@ -348,12 +400,16 @@
 
     let trendTimelineInstance = null;
     let paradigmTimelineInstance = null;
+    let activeTabKey = null;
+    let isLoading = false;
+    const tabCache = {};
 
     const el = {
       timelineTop: document.getElementById("timelineTop"),
       timelineBottom: document.getElementById("timelineBottom"),
       timelineShell: document.getElementById("timelineShell"),
       paradigmShell: document.getElementById("paradigmShell"),
+      tabs: document.getElementById("tabs"),
       status: document.getElementById("status"),
       statusText: document.getElementById("statusText"),
       spinner: document.getElementById("spinner"),
@@ -385,23 +441,15 @@
       el.paradigmShell.classList.add("hidden");
     }
 
-    function csvUrl(sheetName) {
-      let gid;
-
-      if (sheetName === SHEET_NAMES.timeline) {
-        gid = SHEET_GIDS.timeline;
-      } else if (sheetName === SHEET_NAMES.master) {
-        gid = SHEET_GIDS.master;
-      } else {
-        throw new Error("Unknown sheet name: " + sheetName);
-      }
+    function csvUrl(sheetName, config) {
+      const gid = config.sheetGids[sheetName === SHEET_NAMES.timeline ? "timeline" : "master"];
 
       if (!gid) {
         throw new Error("Missing gid for sheet: " + sheetName);
       }
 
-      const separator = PUBLISHED_BASE.includes("?") ? "&" : "?";
-      return PUBLISHED_BASE + separator + "single=true&gid=" + encodeURIComponent(gid) + "&output=csv";
+      const separator = config.publishedBase.includes("?") ? "&" : "?";
+      return config.publishedBase + separator + "single=true&gid=" + encodeURIComponent(gid) + "&output=csv";
     }
 
     function buildRequestUrl(rawUrl) {
@@ -453,8 +501,8 @@
       }
     }
 
-    async function fetchSheetRows(sheetName, sheetKind) {
-      const targetUrl = csvUrl(sheetName);
+    async function fetchSheetRows(sheetName, sheetKind, config) {
+      const targetUrl = csvUrl(sheetName, config);
       const requestUrl = buildRequestUrl(targetUrl);
       let response;
 
@@ -843,42 +891,122 @@
       paradigmTimelineInstance.setWindow(data.options.start, data.options.end, { animation: false });
     }
 
-    async function loadAndRenderTimeline() {
-      setLoadingState("Loading Timeline and Master sheets...");
+    function activateTab(tabKey) {
+      if (isLoading) {
+        return;
+      }
+
+      activeTabKey = tabKey;
+
+      const tabButtons = el.tabs.querySelectorAll(".tab");
+      for (let i = 0; i < tabButtons.length; i += 1) {
+        const t = tabButtons[i];
+        const isActive = t.getAttribute("data-tab") === tabKey;
+        t.classList.toggle("active", isActive);
+        t.setAttribute("aria-selected", String(isActive));
+      }
+
+      loadAndRenderTimeline();
+    }
+
+    function configIsValid(config) {
+      return config && config.publishedBase && config.sheetGids.timeline && config.sheetGids.master;
+    }
+
+    async function loadAndRenderTimeline(forceRefresh) {
+      if (isLoading) {
+        return;
+      }
+
+      const config = TIMELINE_CONFIGS[activeTabKey];
+      if (!configIsValid(config)) {
+        setErrorState("No data source configured for " + (config ? config.label : activeTabKey));
+        return;
+      }
+
+      isLoading = true;
       const t0 = performance.now();
+      let timelineRows;
+      let masterRows;
+      let fromCache = false;
 
-       try {
-        const [timelineRows, masterRows] = await Promise.all([
-          fetchSheetRows(SHEET_NAMES.timeline, "timeline"),
-          fetchSheetRows(SHEET_NAMES.master, "master")
-        ]);
+      if (forceRefresh) {
+        delete tabCache[activeTabKey];
+      }
 
-         await nextTick();
-         setLoadingState("Preparing timeline data...");
+      if (tabCache[activeTabKey]) {
+        timelineRows = tabCache[activeTabKey].timelineRows;
+        masterRows = tabCache[activeTabKey].masterRows;
+        fromCache = true;
+      } else {
+        setLoadingState("Loading Timeline and Master sheets...");
 
-        const data = buildTimelineData(timelineRows, masterRows);
-        const elapsed = ((performance.now() - t0) / 1000).toFixed(1);
-
-         await nextTick();
-         setLoadingState("Rendering timeline...");
-
-          renderTimeline(data);
-
-        setReadyState(
-            "Timeline loaded in " + elapsed + "s. Master rows: " + data.masterRowCount +
-            ". Items: " + (data.trendItems.length + data.paradigmItems.length) + "."
-          );
-        refreshVisibleTimelines();
+        try {
+          const results = await Promise.all([
+            fetchSheetRows(SHEET_NAMES.timeline, "timeline", config),
+            fetchSheetRows(SHEET_NAMES.master, "master", config)
+          ]);
+          timelineRows = results[0];
+          masterRows = results[1];
+          tabCache[activeTabKey] = { timelineRows, masterRows };
         } catch (error) {
           const msg = error && error.message ? error.message : "Unknown error";
           setErrorState("Unable to load timeline: " + msg);
           console.error(error);
+          isLoading = false;
+          return;
         }
-     }
+      }
 
-    el.reloadBtn.addEventListener("click", loadAndRenderTimeline);
+      try {
+        await nextTick();
+        setLoadingState("Preparing timeline data...");
 
-    loadAndRenderTimeline();
+        const data = buildTimelineData(timelineRows, masterRows);
+        const elapsed = ((performance.now() - t0) / 1000).toFixed(1);
+
+        if (data.trendItems.length + data.paradigmItems.length === 0) {
+          setErrorState(config.label + " has no data yet.");
+          isLoading = false;
+          return;
+        }
+
+        await nextTick();
+        setLoadingState("Rendering timeline...");
+
+        renderTimeline(data);
+
+        const source = fromCache ? " (cached)" : "";
+        setReadyState(
+          "Timeline loaded in " + elapsed + "s" + source + ". Master rows: " + data.masterRowCount +
+          ". Items: " + (data.trendItems.length + data.paradigmItems.length) + "."
+        );
+        refreshVisibleTimelines();
+      } catch (error) {
+        const msg = error && error.message ? error.message : "Unknown error";
+        setErrorState("Unable to prepare timeline: " + msg);
+        console.error(error);
+      } finally {
+        isLoading = false;
+      }
+    }
+
+    el.tabs.addEventListener("click", function (event) {
+      const tab = event.target.closest(".tab");
+      if (!tab) {
+        return;
+      }
+      const tabKey = tab.getAttribute("data-tab");
+      if (tabKey && tabKey !== activeTabKey) {
+        activateTab(tabKey);
+      }
+    });
+
+    el.reloadBtn.addEventListener("click", function () {
+      loadAndRenderTimeline(true);
+    });
+
+    activateTab(ACTIVE_TAB_KEY);
   </script>
 </body>
 </html>
