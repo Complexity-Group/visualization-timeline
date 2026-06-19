@@ -292,6 +292,125 @@
       display: none;
     }
 
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      backdrop-filter: blur(2px);
+    }
+
+    .modal-overlay:not(.hidden) {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--card);
+      border-radius: 14px;
+      box-shadow: 0 20px 60px rgba(2, 6, 23, 0.2);
+      width: min(90vw, 520px);
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .modal-title {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .modal-close {
+      border: none;
+      background: transparent;
+      font-size: 1.4rem;
+      line-height: 1;
+      cursor: pointer;
+      color: var(--muted);
+      padding: 0.25rem;
+      border-radius: 6px;
+      transition: background-color 0.15s ease;
+    }
+
+    .modal-close:hover {
+      background: #f1f5f9;
+      color: var(--fg);
+    }
+
+    .modal-body {
+      padding: 1.25rem;
+      overflow-y: auto;
+    }
+
+    .event-timeline {
+      position: relative;
+      padding-left: 1.75rem;
+    }
+
+    .event-timeline::before {
+      content: "";
+      position: absolute;
+      left: 0.45rem;
+      top: 0.35rem;
+      bottom: 0.35rem;
+      width: 2px;
+      background: var(--border);
+      border-radius: 1px;
+    }
+
+    .event-node {
+      position: relative;
+      padding-bottom: 1.25rem;
+    }
+
+    .event-node:last-child {
+      padding-bottom: 0;
+    }
+
+    .event-node::before {
+      content: "";
+      position: absolute;
+      left: -1.3rem;
+      top: 0.35rem;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 2px solid var(--card);
+      box-shadow: 0 0 0 2px var(--accent);
+    }
+
+    .event-date {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-bottom: 0.15rem;
+      font-weight: 500;
+    }
+
+    .event-desc {
+      font-size: 0.88rem;
+      color: var(--fg);
+      line-height: 1.45;
+    }
+
+    .event-empty {
+      color: var(--muted);
+      font-size: 0.88rem;
+      text-align: center;
+      padding: 1rem 0;
+    }
+
     @media (max-width: 768px) {
       .widget {
         margin: 0.6rem;
@@ -337,6 +456,16 @@
       <div id="timelineBottom"></div>
     </div>
   </section>
+
+  <div class="modal-overlay hidden" id="modalOverlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modalTitle"></h3>
+        <button class="modal-close" id="modalClose" type="button" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.5.3/papaparse.min.js"></script>
   <script src="https://unpkg.com/vis-timeline/standalone/umd/vis-timeline-graph2d.min.js"></script>
@@ -403,6 +532,7 @@
     let activeTabKey = null;
     let isLoading = false;
     const tabCache = {};
+    let currentTrendItems = [];
 
     const el = {
       timelineTop: document.getElementById("timelineTop"),
@@ -413,7 +543,11 @@
       status: document.getElementById("status"),
       statusText: document.getElementById("statusText"),
       spinner: document.getElementById("spinner"),
-      reloadBtn: document.getElementById("reloadBtn")
+      reloadBtn: document.getElementById("reloadBtn"),
+      modalOverlay: document.getElementById("modalOverlay"),
+      modalTitle: document.getElementById("modalTitle"),
+      modalBody: document.getElementById("modalBody"),
+      modalClose: document.getElementById("modalClose")
     };
 
     function setLoadingState(message) {
@@ -860,6 +994,8 @@
     }
 
     function renderTimeline(data) {
+      currentTrendItems = data.trendItems;
+
       const trendItems = new vis.DataSet(data.trendItems);
       const trendGroups = new vis.DataSet(data.trendGroups);
       const paradigmItems = new vis.DataSet(data.paradigmItems);
@@ -878,6 +1014,8 @@
         trendTimelineInstance = new vis.Timeline(el.timelineTop, trendItems, trendGroups, buildTopOptions(data.options, 1));
       }
 
+      attachTrendClickHandler(trendTimelineInstance);
+
       paradigmTimelineInstance = new vis.Timeline(
         el.timelineBottom,
         paradigmItems,
@@ -890,6 +1028,101 @@
       // Keep the initial viewport aligned after creation.
       paradigmTimelineInstance.setWindow(data.options.start, data.options.end, { animation: false });
     }
+
+    function formatDate(date) {
+      if (!(date instanceof Date) || isNaN(date)) {
+        return "";
+      }
+      const y = date.getFullYear();
+      const m = date.getMonth();
+      const d = date.getDate();
+      const hasMonth = m !== 0 || d !== 1;
+      const hasDay = d !== 1;
+      if (hasDay) {
+        return y + "-" + String(m + 1).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+      }
+      if (hasMonth) {
+        return y + "-" + String(m + 1).padStart(2, "0");
+      }
+      return String(y);
+    }
+
+    function showModal(trendTitle, subgroup) {
+      const events = currentTrendItems.filter(function (item) {
+        return item.type === "point" && item.subgroup === subgroup;
+      });
+
+      events.sort(function (a, b) {
+        return a.start - b.start;
+      });
+
+      el.modalTitle.textContent = trendTitle;
+
+      if (events.length === 0) {
+        el.modalBody.innerHTML = '<div class="event-empty">No events recorded for this trend.</div>';
+      } else {
+        let html = '<div class="event-timeline">';
+        for (let i = 0; i < events.length; i += 1) {
+          html += '<div class="event-node">' +
+            '<div class="event-date">' + formatDate(events[i].start) + '</div>' +
+            '<div class="event-desc">' + escapeHtml(events[i].title || events[i].content || "") + '</div>' +
+            '</div>';
+        }
+        html += '</div>';
+        el.modalBody.innerHTML = html;
+      }
+
+      el.modalOverlay.classList.remove("hidden");
+    }
+
+    function hideModal() {
+      el.modalOverlay.classList.add("hidden");
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.appendChild(document.createTextNode(text));
+      return div.innerHTML;
+    }
+
+    function attachTrendClickHandler(timelineInstance) {
+      timelineInstance.on("click", function (props) {
+        if (!props.item) {
+          return;
+        }
+
+        let clickedItem = null;
+        for (let i = 0; i < currentTrendItems.length; i += 1) {
+          if (currentTrendItems[i].id === props.item) {
+            clickedItem = currentTrendItems[i];
+            break;
+          }
+        }
+
+        if (!clickedItem || clickedItem.type !== "range") {
+          return;
+        }
+
+        showModal(clickedItem.content, clickedItem.subgroup);
+      });
+    }
+
+    el.modalClose.addEventListener("click", (event) => {
+      event.stopPropagation();
+      hideModal();
+    });
+
+    el.modalOverlay.addEventListener("click", (event) => {
+      if (event.target === el.modalOverlay) {
+        hideModal();
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        hideModal();
+      }
+    });
 
     function activateTab(tabKey) {
       if (isLoading) {
