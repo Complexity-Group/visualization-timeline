@@ -203,6 +203,10 @@
       min-height: 14px;
     }
 
+    .vis-item.vis-dot {
+      display: none;
+    }
+
     .vis-item.vis-range .vis-item-content {
       padding: 1px 6px;
       line-height: 1.1;
@@ -215,51 +219,105 @@
     }
 
     .vis-item.trend-range.trend-color-0 {
-      background: #dbeafe;
-      border-color: #60a5fa;
+      --trend-line: #60a5fa;
       color: #1e3a8a;
     }
 
     .vis-item.trend-range.trend-color-1 {
-      background: #dcfce7;
-      border-color: #4ade80;
+      --trend-line: #4ade80;
       color: #166534;
     }
 
     .vis-item.trend-range.trend-color-2 {
-      background: #fee2e2;
-      border-color: #f87171;
+      --trend-line: #f87171;
       color: #991b1b;
     }
 
     .vis-item.trend-range.trend-color-3 {
-      background: #fef3c7;
-      border-color: #fbbf24;
+      --trend-line: #fbbf24;
       color: #92400e;
     }
 
     .vis-item.trend-range.trend-color-4 {
-      background: #ede9fe;
-      border-color: #a78bfa;
+      --trend-line: #a78bfa;
       color: #5b21b6;
     }
 
     .vis-item.trend-range.trend-color-5 {
-      background: #cffafe;
-      border-color: #22d3ee;
+      --trend-line: #22d3ee;
       color: #155e75;
     }
 
     .vis-item.trend-range.trend-color-6 {
-      background: #fce7f3;
-      border-color: #f472b6;
+      --trend-line: #f472b6;
       color: #9d174d;
     }
 
     .vis-item.trend-range.trend-color-7 {
-      background: #e2e8f0;
-      border-color: #94a3b8;
+      --trend-line: #94a3b8;
       color: #334155;
+    }
+
+    .vis-item.trend-range {
+      background: linear-gradient(var(--trend-line), var(--trend-line)) no-repeat center / 100% 3px,
+                  transparent !important;
+      border: none !important;
+      border-color: transparent !important;
+      overflow: visible !important;
+      min-height: 28px !important;
+      cursor: pointer;
+      transition: filter 0.15s ease;
+    }
+
+    .vis-item.trend-range:hover {
+      filter: brightness(0.85) saturate(1.3);
+    }
+
+    .vis-item.trend-range .vis-item-content {
+      position: relative;
+      top: -2px;
+      padding: 0 6px !important;
+      font-weight: 600;
+      font-size: 0.8rem;
+    }
+
+    .vis-item.trend-range.dot-left::before {
+      content: "";
+      position: absolute;
+      left: -5px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--trend-line);
+      z-index: 1;
+    }
+
+    .vis-item.trend-range.arrow-right::after {
+      content: "";
+      position: absolute;
+      right: -5px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 0;
+      height: 0;
+      border-left: 8px solid var(--trend-line);
+      border-top: 5px solid transparent;
+      border-bottom: 5px solid transparent;
+    }
+
+    .vis-item.trend-range.dot-right::after {
+      content: "";
+      position: absolute;
+      right: -5px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--trend-line);
+      z-index: 1;
     }
 
     .vis-item.vis-background {
@@ -276,10 +334,12 @@
       width: 14px;
       border-width: 2px;
       border-radius: 999px;
+      display: none;
     }
 
     .vis-item.vis-point .vis-item-content {
       font-size: 0.72rem;
+      font-weight: bold;
       line-height: 1.1;
       padding: 1px 6px;
       white-space: nowrap;
@@ -361,7 +421,7 @@
     .event-timeline::before {
       content: "";
       position: absolute;
-      left: 0.45rem;
+      left: calc(0.45rem + 5px);
       top: 0.35rem;
       bottom: 0.35rem;
       width: 2px;
@@ -470,6 +530,7 @@
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.5.3/papaparse.min.js"></script>
   <script src="https://unpkg.com/vis-timeline/standalone/umd/vis-timeline-graph2d.min.js"></script>
   <script>
+    // const isMobile = window.innerWidth <= 768;
     const TIMELINE_CONFIGS = {
       "energy-sources": {
         label: "Energy Sources",
@@ -499,7 +560,7 @@
 
     const DEFAULT_GROUP_ID = "default";
     const PARADIGM_GROUP_ID = "paradigms";
-    const TOP_TIMELINE_HEIGHT = 360;
+    const TOP_TIMELINE_HEIGHT = 550;
     const BOTTOM_TIMELINE_HEIGHT = 100;
     const EVENT_TITLE_MAX = 10;
     const REQUIRED_HEADERS = {
@@ -533,6 +594,7 @@
     let isLoading = false;
     const tabCache = {};
     let currentTrendItems = [];
+    let currentTrendOptions = null;
 
     const el = {
       timelineTop: document.getElementById("timelineTop"),
@@ -872,17 +934,60 @@
       parseMasterRows(masterRows, timeline.titleToSubgroup, timeline.trendSubgroups, timeline.trendItems);
 
       const now = new Date();
+      const timelineStart = timeline.start || new Date(now.getFullYear() - 100, 0, 1);
+      const timelineEnd = timeline.end || now;
+      const span = timelineEnd.getTime() - timelineStart.getTime();
+      const bufferFactor = window.innerWidth <= 768 ? 0.02 : 0.01;
+      const endWithBuffer = new Date(timelineEnd.getTime() + span * bufferFactor);
+
+      // Group trend range items by subgroup to mark arrow/dot endpoints
+      const subgroupRanges = {};
+      for (let i = 0; i < timeline.trendItems.length; i += 1) {
+        const item = timeline.trendItems[i];
+        if (item.type === "range" && item.subgroup) {
+          if (!subgroupRanges[item.subgroup]) {
+            subgroupRanges[item.subgroup] = [];
+          }
+          subgroupRanges[item.subgroup].push(item);
+        }
+      }
+
+      for (const subgroup in subgroupRanges) {
+        const ranges = subgroupRanges[subgroup];
+        ranges.sort((a, b) => a.start - b.start);
+        const lastIdx = ranges.length - 1;
+
+        for (let i = 0; i < ranges.length; i += 1) {
+          const item = ranges[i];
+
+          if (i === lastIdx) {
+            item.className += " arrow-right";
+          } else {
+            item.className += " dot-right";
+          }
+
+          if (item.start.getTime() !== timelineStart.getTime()) {
+            item.className += " dot-left";
+          }
+        }
+      }
 
       return {
         trendGroups: [createGroupWithSubgroups(DEFAULT_GROUP_ID, Array.from(timeline.trendSubgroups))],
         paradigmGroups: [createGroupWithSubgroups(PARADIGM_GROUP_ID, Array.from(timeline.paradigmSubgroups))],
         trendItems: timeline.trendItems,
         paradigmItems: timeline.paradigmItems,
-        options: {
+        trendOptions: {
           stack: false,
           stackSubgroups: true,
-          start: timeline.start || new Date(now.getFullYear() - 100, 0, 1),
-          end: timeline.end || now
+          start: timelineStart,
+          end: endWithBuffer
+        },
+        paradigmOptions: {
+          stack: false,
+          stackSubgroups: true,
+          start: timelineStart,
+          end: timelineEnd
         },
         masterRowCount: masterRows.length
       };
@@ -987,6 +1092,10 @@
           trendTimelineInstance.redraw();
           paradigmTimelineInstance.redraw();
 
+          if (currentTrendOptions) {
+            trendTimelineInstance.setWindow(currentTrendOptions.start, currentTrendOptions.end, { animation: false });
+          }
+
           const topWindow = trendTimelineInstance.getWindow();
           paradigmTimelineInstance.setWindow(topWindow.start, topWindow.end, { animation: false });
         });
@@ -995,6 +1104,7 @@
 
     function renderTimeline(data) {
       currentTrendItems = data.trendItems;
+      currentTrendOptions = data.trendOptions;
 
       const trendItems = new vis.DataSet(data.trendItems);
       const trendGroups = new vis.DataSet(data.trendGroups);
@@ -1009,10 +1119,12 @@
       }
 
       try {
-        trendTimelineInstance = new vis.Timeline(el.timelineTop, trendItems, trendGroups, buildTopOptions(data.options, 1));
+        trendTimelineInstance = new vis.Timeline(el.timelineTop, trendItems, trendGroups, buildTopOptions(data.trendOptions, 1));
       } catch (error) {
-        trendTimelineInstance = new vis.Timeline(el.timelineTop, trendItems, trendGroups, buildTopOptions(data.options, 1));
+        trendTimelineInstance = new vis.Timeline(el.timelineTop, trendItems, trendGroups, buildTopOptions(data.trendOptions, 1));
       }
+
+      trendTimelineInstance.setWindow(data.trendOptions.start, data.trendOptions.end, { animation: false });
 
       attachTrendClickHandler(trendTimelineInstance);
 
@@ -1020,13 +1132,13 @@
         el.timelineBottom,
         paradigmItems,
         paradigmGroups,
-        buildBottomOptions(data.options)
+        buildBottomOptions(data.paradigmOptions)
       );
 
       syncTimelineWindowsBidirectional(trendTimelineInstance, paradigmTimelineInstance);
 
       // Keep the initial viewport aligned after creation.
-      paradigmTimelineInstance.setWindow(data.options.start, data.options.end, { animation: false });
+      paradigmTimelineInstance.setWindow(data.trendOptions.start, data.trendOptions.end, { animation: false });
     }
 
     function formatDate(date) {
@@ -1073,10 +1185,12 @@
       }
 
       el.modalOverlay.classList.remove("hidden");
+      document.body.style.overflow = "hidden";
     }
 
     function hideModal() {
       el.modalOverlay.classList.add("hidden");
+      document.body.style.overflow = "";
     }
 
     function escapeHtml(text) {
