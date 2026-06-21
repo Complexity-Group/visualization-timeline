@@ -176,11 +176,18 @@
     }
 
     div.vis-time-axis.vis-foreground {
-      background: var(--axis-bg);
+      background: rgb(0, 78, 114);
       border-top: 1px solid var(--axis-border);
       border-bottom: 1px solid var(--axis-border);
-      height: 20px;
-      font-size: 10px;
+      height: 32px !important;
+    }
+
+    div.vis-time-axis.vis-foreground .vis-text {
+      font-size: 13px;
+      color: #fff;
+      border-right: 1px solid rgb(255, 255, 255);
+      box-sizing: border-box;
+      padding: 6px 4px;
     }
 
     /*.vis-time-axis {*/
@@ -213,9 +220,17 @@
     }
 
     .vis-item.paradigm-range {
-      background: rgba(37, 99, 235, 0.12);
-      border-color: rgba(37, 99, 235, 0.4);
-      color: #1e3a8a;
+      background: rgba(255, 213, 79, 0.12);
+      border: 3px rgba(255, 213, 79, 0.6);
+      border-radius: 0;
+      color: #000;
+      font-size: 0.85rem;
+      line-height: 1.3;
+      min-height: 36px;
+    }
+
+    .vis-item.paradigm-range .vis-item-content {
+      padding: 4px;
     }
 
     .vis-item.trend-range.trend-color-0 {
@@ -561,7 +576,7 @@
     const DEFAULT_GROUP_ID = "default";
     const PARADIGM_GROUP_ID = "paradigms";
     const TOP_TIMELINE_HEIGHT = 550;
-    const BOTTOM_TIMELINE_HEIGHT = 100;
+    const BOTTOM_TIMELINE_HEIGHT = 140;
     const EVENT_TITLE_MAX = 10;
     const REQUIRED_HEADERS = {
       timeline: [
@@ -1046,8 +1061,8 @@
         groupHeightMode: "fixed",
         margin: {
           item: {
-            horizontal: 8,
-            vertical: 2
+            horizontal: 0,
+            vertical: -2.5
           },
           axis: 0
         },
