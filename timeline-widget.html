@@ -546,6 +546,75 @@
       padding: 1rem 0;
     }
 
+    .skeleton-container {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .skeleton-container.hidden {
+      display: none;
+    }
+
+    .skeleton-block {
+      border-radius: 12px;
+      animation: shimmer 2.5s ease-in-out infinite;
+      background-size: 300% 100%;
+    }
+
+    .skeleton-trends {
+      height: 400px;
+      border-radius: 12px 12px 0 0;
+      border: 1px solid var(--border);
+      background-image: linear-gradient(
+        100deg,
+        #e2e7f0 0%,
+        #e2e8f0 35%,
+        rgba(255, 255, 255, 0.9) 50%,
+        #e2e8f0 65%,
+        #e2e7f0 100%
+      );
+    }
+
+    .skeleton-axis {
+      height: 32px;
+      border-radius: 0;
+      border-left: 1px solid var(--axis-border);
+      border-right: 1px solid var(--axis-border);
+      background-image: linear-gradient(
+        100deg,
+        #94a3b8 0%,
+        #94a3b8 35%,
+        #cbd5e1 50%,
+        #94a3b8 65%,
+        #94a3b8 100%
+      );
+    }
+
+    .skeleton-paradigms {
+      height: 100px;
+      border-radius: 0 0 12px 12px;
+      border: 1px solid var(--border);
+      border-top: none;
+      background-image: linear-gradient(
+        100deg,
+        #e2e7f0 0%,
+        #e2e8f0 35%,
+        rgba(255, 255, 255, 0.85) 50%,
+        #e2e8f0 65%,
+        #e2e7f0 100%
+      );
+    }
+
+    @keyframes shimmer {
+      0% {
+        background-position: 150% 0;
+      }
+      100% {
+        background-position: -150% 0;
+      }
+    }
+
     @media (max-width: 768px) {
       .widget {
         margin: 0.6rem;
@@ -582,6 +651,12 @@
     <div id="status" class="status" aria-live="polite">
       <span class="spinner" id="spinner"></span>
       <span id="statusText">Preparing timeline...</span>
+    </div>
+
+    <div class="skeleton-container" id="skeleton">
+      <div class="skeleton-block skeleton-trends"></div>
+      <div class="skeleton-block skeleton-axis"></div>
+      <div class="skeleton-block skeleton-paradigms"></div>
     </div>
 
     <div class="timeline-shell timeline-top-shell hidden" id="timelineShell">
@@ -667,6 +742,7 @@
     let paradigmTimelineInstance = null;
     let activeTabKey = null;
     let isLoading = false;
+    let loadGeneration = 0;
     const tabCache = {};
     let currentTrendItems = [];
     let currentTrendOptions = null;
@@ -680,6 +756,7 @@
       status: document.getElementById("status"),
       statusText: document.getElementById("statusText"),
       spinner: document.getElementById("spinner"),
+      skeleton: document.getElementById("skeleton"),
       reloadBtn: document.getElementById("reloadBtn"),
       modalOverlay: document.getElementById("modalOverlay"),
       modalTitle: document.getElementById("modalTitle"),
@@ -689,8 +766,9 @@
 
     function setLoadingState(message) {
       el.status.classList.remove("hidden", "error");
-      el.spinner.classList.remove("hidden");
+      el.spinner.classList.add("hidden");
       el.statusText.textContent = message;
+      el.skeleton.classList.remove("hidden");
       el.timelineShell.classList.add("hidden");
       el.paradigmShell.classList.add("hidden");
     }
@@ -699,6 +777,7 @@
       el.status.classList.remove("error");
       el.spinner.classList.add("hidden");
       el.statusText.textContent = message;
+      el.skeleton.classList.add("hidden");
       el.timelineShell.classList.remove("hidden");
       el.paradigmShell.classList.remove("hidden");
     }
@@ -708,6 +787,7 @@
       el.status.classList.add("error");
       el.spinner.classList.add("hidden");
       el.statusText.textContent = message;
+      el.skeleton.classList.add("hidden");
       el.timelineShell.classList.add("hidden");
       el.paradigmShell.classList.add("hidden");
     }
@@ -1353,10 +1433,6 @@
     });
 
     function activateTab(tabKey) {
-      if (isLoading) {
-        return;
-      }
-
       activeTabKey = tabKey;
 
       const tabButtons = el.tabs.querySelectorAll(".tab");
@@ -1375,9 +1451,7 @@
     }
 
     async function loadAndRenderTimeline(forceRefresh) {
-      if (isLoading) {
-        return;
-      }
+      const gen = ++loadGeneration;
 
       const config = TIMELINE_CONFIGS[activeTabKey];
       if (!configIsValid(config)) {
@@ -1407,10 +1481,16 @@
             fetchSheetRows(SHEET_NAMES.timeline, "timeline", config),
             fetchSheetRows(SHEET_NAMES.master, "master", config)
           ]);
+          if (gen !== loadGeneration) {
+            return;
+          }
           timelineRows = results[0];
           masterRows = results[1];
           tabCache[activeTabKey] = { timelineRows, masterRows };
         } catch (error) {
+          if (gen !== loadGeneration) {
+            return;
+          }
           const msg = error && error.message ? error.message : "Unknown error";
           setErrorState("Unable to load timeline: " + msg);
           console.error(error);
@@ -1420,6 +1500,9 @@
       }
 
       try {
+        if (gen !== loadGeneration) {
+          return;
+        }
         await nextTick();
         setLoadingState("Preparing timeline data...");
 
@@ -1428,10 +1511,12 @@
 
         if (data.trendItems.length + data.paradigmItems.length === 0) {
           setErrorState(config.label + " has no data yet.");
-          isLoading = false;
           return;
         }
 
+        if (gen !== loadGeneration) {
+          return;
+        }
         await nextTick();
         setLoadingState("Rendering timeline...");
 
@@ -1448,7 +1533,9 @@
         setErrorState("Unable to prepare timeline: " + msg);
         console.error(error);
       } finally {
-        isLoading = false;
+        if (gen === loadGeneration) {
+          isLoading = false;
+        }
       }
     }
 
