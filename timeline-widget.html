@@ -80,6 +80,16 @@
       background: #f8fafc;
     }
 
+    .button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .button.success {
+      border-color: #4ade80;
+      color: #166534;
+    }
+
     .tabs-bar {
       display: flex;
       gap: 0.25rem;
@@ -638,6 +648,8 @@
     <div class="widget-header">
       <h2 class="widget-title">Timeline Demo</h2>
       <div class="controls">
+        <button class="button" id="shareBtn" type="button" title="Copy a shareable link to the current view">Share</button>
+        <button class="button" id="exportBtn" type="button" title="Download the timeline as a JPEG image">Export JPEG</button>
         <button class="button" id="reloadBtn" type="button">Reload Data</button>
       </div>
     </div>
@@ -679,6 +691,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.5.3/papaparse.min.js"></script>
   <script src="https://unpkg.com/vis-timeline/standalone/umd/vis-timeline-graph2d.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script>
     // const isMobile = window.innerWidth <= 768;
     const TIMELINE_CONFIGS = {
@@ -746,6 +759,7 @@
     const tabCache = {};
     let currentTrendItems = [];
     let currentTrendOptions = null;
+    let pendingInitialWindow = null;
 
     const el = {
       timelineTop: document.getElementById("timelineTop"),
@@ -758,6 +772,8 @@
       spinner: document.getElementById("spinner"),
       skeleton: document.getElementById("skeleton"),
       reloadBtn: document.getElementById("reloadBtn"),
+      shareBtn: document.getElementById("shareBtn"),
+      exportBtn: document.getElementById("exportBtn"),
       modalOverlay: document.getElementById("modalOverlay"),
       modalTitle: document.getElementById("modalTitle"),
       modalBody: document.getElementById("modalBody"),
@@ -1514,6 +1530,56 @@
       }, 2000);
     }
 
+    async function exportTimelineAsJpeg() {
+      const top = el.timelineShell;
+      const bottom = el.paradigmShell;
+      const originalLabel = el.exportBtn.textContent;
+      el.exportBtn.disabled = true;
+      el.exportBtn.textContent = "Exporting…";
+      try {
+        const options = {
+          backgroundColor: getComputedStyle(document.body).backgroundColor || "#ffffff",
+          scale: 2,
+          useCORS: true,
+          logging: false
+        };
+        const topCanvas = await html2canvas(top, options);
+        const bottomCanvas = await html2canvas(bottom, options);
+
+        const width = Math.max(topCanvas.width, bottomCanvas.width);
+        const height = topCanvas.height + bottomCanvas.height;
+        const combined = document.createElement("canvas");
+        combined.width = width;
+        combined.height = height;
+        const ctx = combined.getContext("2d");
+        ctx.fillStyle = options.backgroundColor;
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(topCanvas, 0, 0);
+        ctx.drawImage(bottomCanvas, 0, topCanvas.height);
+
+        const jpegUrl = combined.toDataURL("image/jpeg", 0.92);
+        const a = document.createElement("a");
+        const stamp = new Date().toISOString().replace(/[:T]/g, "-").slice(0, 19);
+        a.href = jpegUrl;
+        a.download = "timeline-" + (activeTabKey || "view") + "-" + stamp + ".jpg";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } catch (error) {
+        console.error("Export failed:", error);
+        el.exportBtn.textContent = "Export failed";
+        setTimeout(() => { el.exportBtn.textContent = originalLabel; }, 2000);
+        return;
+      }
+      el.exportBtn.textContent = "Saved";
+      el.exportBtn.classList.add("success");
+      setTimeout(() => {
+        el.exportBtn.textContent = originalLabel;
+        el.exportBtn.classList.remove("success");
+        el.exportBtn.disabled = false;
+      }, 2000);
+    }
+
     function activateTab(tabKey) {
       activeTabKey = tabKey;
 
@@ -1637,6 +1703,7 @@
       loadAndRenderTimeline(true);
     });
 
+    el.exportBtn.addEventListener("click", exportTimelineAsJpeg);
     el.shareBtn.addEventListener("click", shareUrl);
 
     activateTab(getInitialTabKey());
