@@ -426,6 +426,12 @@
       font-weight: 600;
     }
 
+    .modal-title-meta {
+      font-weight: 400;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
     .modal-close {
       border: none;
       background: transparent;
@@ -1159,6 +1165,21 @@
         }
       }
 
+      // Add event count badges to trend range items
+      const eventCounts = {};
+      for (let i = 0; i < timeline.trendItems.length; i += 1) {
+        const item = timeline.trendItems[i];
+        if (item.type === "point" && item.subgroup) {
+          eventCounts[item.subgroup] = (eventCounts[item.subgroup] || 0) + 1;
+        }
+      }
+      for (let i = 0; i < timeline.trendItems.length; i += 1) {
+        const item = timeline.trendItems[i];
+        if (item.type === "range" && eventCounts[item.subgroup]) {
+          item.content += " (" + eventCounts[item.subgroup] + ")";
+        }
+      }
+
       return {
         trendGroups: [createGroupWithSubgroups(DEFAULT_GROUP_ID, Array.from(timeline.trendSubgroups))],
         paradigmGroups: [createGroupWithSubgroups(PARADIGM_GROUP_ID, Array.from(timeline.paradigmSubgroups))],
@@ -1361,7 +1382,17 @@
         return a.start - b.start;
       });
 
-      el.modalTitle.textContent = trendTitle;
+      let titleHtml = escapeHtml(trendTitle);
+      if (events.length > 0) {
+        const minStart = events[0].start;
+        const maxStart = events[events.length - 1].start;
+        const dateSpan = minStart.getFullYear() !== maxStart.getFullYear()
+          ? formatDate(minStart) + " – " + formatDate(maxStart)
+          : formatDate(minStart);
+        titleHtml += ' <span class="modal-title-meta"> · ' + events.length + ' event' + (events.length !== 1 ? 's' : '') + ' · ' + escapeHtml(dateSpan) + '</span>';
+      }
+
+      el.modalTitle.innerHTML = titleHtml;
 
       if (events.length === 0) {
         el.modalBody.innerHTML = '<div class="event-empty">No events recorded for this trend.</div>';
