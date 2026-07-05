@@ -137,6 +137,16 @@
       color: var(--error);
     }
 
+    .status-spacer {
+      flex: 1;
+    }
+
+    .zoom-btn {
+      padding: 0.2rem 0.55rem;
+      font-size: 0.85rem;
+      line-height: 1.3;
+    }
+
     .spinner {
       width: 1rem;
       height: 1rem;
@@ -650,7 +660,6 @@
       <div class="controls">
         <button class="button" id="shareBtn" type="button" title="Copy a shareable link to the current view">Share</button>
         <button class="button" id="exportBtn" type="button" title="Download the timeline as a JPEG image">Export JPEG</button>
-        <button class="button" id="reloadBtn" type="button">Reload Data</button>
       </div>
     </div>
 
@@ -663,6 +672,10 @@
     <div id="status" class="status" aria-live="polite">
       <span class="spinner" id="spinner"></span>
       <span id="statusText">Preparing timeline...</span>
+      <span class="status-spacer"></span>
+      <button class="button zoom-btn" id="zoomOutBtn" type="button" title="Zoom out">−</button>
+      <button class="button zoom-btn" id="zoomInBtn" type="button" title="Zoom in">+</button>
+      <button class="button zoom-btn" id="resetZoomBtn" type="button" title="Reset zoom to fit all items">Reset</button>
     </div>
 
     <div class="skeleton-container" id="skeleton">
@@ -771,9 +784,11 @@
       statusText: document.getElementById("statusText"),
       spinner: document.getElementById("spinner"),
       skeleton: document.getElementById("skeleton"),
-      reloadBtn: document.getElementById("reloadBtn"),
       shareBtn: document.getElementById("shareBtn"),
       exportBtn: document.getElementById("exportBtn"),
+      zoomInBtn: document.getElementById("zoomInBtn"),
+      zoomOutBtn: document.getElementById("zoomOutBtn"),
+      resetZoomBtn: document.getElementById("resetZoomBtn"),
       modalOverlay: document.getElementById("modalOverlay"),
       modalTitle: document.getElementById("modalTitle"),
       modalBody: document.getElementById("modalBody"),
@@ -1688,6 +1703,24 @@
       }
     }
 
+    function zoomTimeline(amount) {
+      if (!trendTimelineInstance) {
+        return;
+      }
+      if (amount < 0) {
+        trendTimelineInstance.zoomOut(Math.abs(amount), { animation: true });
+      } else {
+        trendTimelineInstance.zoomIn(amount, { animation: true });
+      }
+    }
+
+    function resetTimelineZoom() {
+      if (!trendTimelineInstance) {
+        return;
+      }
+      trendTimelineInstance.fit({ animation: true });
+    }
+
     el.tabs.addEventListener("click", function (event) {
       const tab = event.target.closest(".tab");
       if (!tab) {
@@ -1699,12 +1732,11 @@
       }
     });
 
-    el.reloadBtn.addEventListener("click", function () {
-      loadAndRenderTimeline(true);
-    });
-
     el.exportBtn.addEventListener("click", exportTimelineAsJpeg);
     el.shareBtn.addEventListener("click", shareUrl);
+    el.zoomInBtn.addEventListener("click", function () { zoomTimeline(0.2); });
+    el.zoomOutBtn.addEventListener("click", function () { zoomTimeline(-0.2); });
+    el.resetZoomBtn.addEventListener("click", resetTimelineZoom);
 
     activateTab(getInitialTabKey());
   </script>
