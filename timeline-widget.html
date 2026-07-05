@@ -1248,7 +1248,10 @@
           trendTimelineInstance.redraw();
           paradigmTimelineInstance.redraw();
 
-          if (currentTrendOptions) {
+          if (pendingInitialWindow) {
+            trendTimelineInstance.setWindow(pendingInitialWindow.start, pendingInitialWindow.end, { animation: false });
+            pendingInitialWindow = null;
+          } else if (currentTrendOptions) {
             trendTimelineInstance.setWindow(currentTrendOptions.start, currentTrendOptions.end, { animation: false });
           }
 
@@ -1283,6 +1286,7 @@
       trendTimelineInstance.setWindow(data.trendOptions.start, data.trendOptions.end, { animation: false });
 
       attachTrendClickHandler(trendTimelineInstance);
+      trendTimelineInstance.on("rangechanged", updateShareUrl);
 
       paradigmTimelineInstance = new vis.Timeline(
         el.timelineBottom,
@@ -1432,6 +1436,84 @@
       }
     });
 
+    function updateShareUrl() {
+      const params = new URLSearchParams();
+      params.set("tab", activeTabKey || "");
+
+      if (trendTimelineInstance) {
+        const w = trendTimelineInstance.getWindow();
+        if (w && w.start && w.end) {
+          params.set("start", w.start.toISOString().slice(0, 10));
+          params.set("end", w.end.toISOString().slice(0, 10));
+        }
+      }
+
+      const url = window.location.pathname + "#" + params.toString();
+      window.history.replaceState(null, "", url);
+    }
+
+    function getInitialTabKey() {
+      const hash = window.location.hash.replace(/^#/, "");
+      if (hash) {
+        const params = new URLSearchParams(hash);
+        const tab = params.get("tab");
+        const startStr = params.get("start");
+        const endStr = params.get("end");
+        const start = startStr ? new Date(startStr) : null;
+        const end = endStr ? new Date(endStr) : null;
+        if (start instanceof Date && !isNaN(start) && end instanceof Date && !isNaN(end) && start <= end) {
+          pendingInitialWindow = { start, end };
+        }
+        if (tab && TIMELINE_CONFIGS[tab]) {
+          return tab;
+        }
+      }
+      return ACTIVE_TAB_KEY;
+    }
+
+    async function shareUrl() {
+      updateShareUrl();
+      const url = window.location.href;
+      const originalLabel = el.shareBtn.textContent;
+      el.shareBtn.disabled = true;
+
+      let copied = false;
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(url);
+          copied = true;
+        }
+      } catch (error) {
+        console.warn("Clipboard write failed, falling back:", error);
+      }
+
+      if (!copied) {
+        const ta = document.createElement("textarea");
+        ta.value = url;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          copied = document.execCommand("copy");
+        } catch (e) {
+          copied = false;
+        }
+        document.body.removeChild(ta);
+      }
+
+      el.shareBtn.textContent = copied ? "Link copied" : "Copy failed";
+      if (copied) {
+        el.shareBtn.classList.add("success");
+      }
+      setTimeout(() => {
+        el.shareBtn.textContent = originalLabel;
+        el.shareBtn.classList.remove("success");
+        el.shareBtn.disabled = false;
+      }, 2000);
+    }
+
     function activateTab(tabKey) {
       activeTabKey = tabKey;
 
@@ -1443,6 +1525,7 @@
         t.setAttribute("aria-selected", String(isActive));
       }
 
+      updateShareUrl();
       loadAndRenderTimeline();
     }
 
@@ -1554,7 +1637,9 @@
       loadAndRenderTimeline(true);
     });
 
-    activateTab(ACTIVE_TAB_KEY);
+    el.shareBtn.addEventListener("click", shareUrl);
+
+    activateTab(getInitialTabKey());
   </script>
 </body>
 </html>
