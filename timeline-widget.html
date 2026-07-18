@@ -716,8 +716,9 @@
     const TIMELINE_CONFIGS = {
       "energy-sources": {
         label: "Energy Sources",
-        publishedBase: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTbmQV5Ao_KYTM4fsZWMwWDE8nwfozZWmXSCgVQX3fc3ltfjMJwB5voQlDATuAlVimdiknIGrL1L0Ij/pub",
-        sheetGids: { timeline: "0", master: "1583828384" }
+        // publishedBase: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTbmQV5Ao_KYTM4fsZWMwWDE8nwfozZWmXSCgVQX3fc3ltfjMJwB5voQlDATuAlVimdiknIGrL1L0Ij/pub",
+        publishedBase: "https://docs.google.com/spreadsheets/d/1wIpTU8C0JHfh_o2dLKWErrjGlq-fRChb7G866rqJgP8/export",
+        sheetGids: { timeline: "645387254", master: "825820318" }
       },
       "energy-uses": {
         label: "Energy Uses",
@@ -742,8 +743,8 @@
 
     const DEFAULT_GROUP_ID = "default";
     const PARADIGM_GROUP_ID = "paradigms";
-    const TOP_TIMELINE_HEIGHT = 550;
-    const BOTTOM_TIMELINE_HEIGHT = 140;
+    const TREND_ROW_HEIGHT = 28;
+    const PARADIGM_ROW_HEIGHT = 35;
     const EVENT_TITLE_MAX = 10;
     const REQUIRED_HEADERS = {
       timeline: [
@@ -758,15 +759,15 @@
         "End Day"
       ],
       master: [
-        "Start Year",
-        "Start Month",
+        "Start Yr",
+        "Start Mo",
         "Start Day",
-        "End Year",
-        "End Month",
+        "End Yr",
+        "End Mo",
         "End Day",
-        "Trend",
+        "Energy Source",
         "Paradigm",
-        "Description"
+        "Event"
       ]
     };
 
@@ -837,7 +838,8 @@
       }
 
       const separator = config.publishedBase.includes("?") ? "&" : "?";
-      return config.publishedBase + separator + "single=true&gid=" + encodeURIComponent(gid) + "&output=csv";
+      // return config.publishedBase + separator + "single=true&gid=" + encodeURIComponent(gid) + "&output=csv";
+      return config.publishedBase + separator + "gid=" + encodeURIComponent(gid) + "&format=csv";
     }
 
     function buildRequestUrl(rawUrl) {
@@ -921,23 +923,34 @@
     }
 
     function parseStartDate(row) {
-      const year = toInt(row["Start Year"]);
+      const rawYear = cellValue(row, "Start Yr") || cellValue(row, "Start Year");
+      if (rawYear === "") {
+        return null;
+      }
+
+      if (rawYear.toUpperCase().indexOf("BCE") !== -1) {
+        const placeholder = new Date(1, 0, 1);
+        placeholder._isBce = true;
+        return placeholder;
+      }
+
+      const year = toInt(rawYear);
       if (year === null) {
         return null;
       }
 
-      const month = toInt(row["Start Month"]);
+      const month = toInt(row["Start Mo"]) || toInt(row["Start Month"]);
       const day = toInt(row["Start Day"]);
       return new Date(year, month === null ? 0 : month, day === null ? 1 : day);
     }
 
     function parseEndDate(row) {
-      const year = toInt(row["End Year"]);
+      const year = toInt(row["End Yr"]) || toInt(row["End Year"]);
       if (year === null) {
         return new Date();
       }
 
-      const month = toInt(row["End Month"]);
+      const month = toInt(row["End Mo"]) || toInt(row["End Month"]);
       const day = toInt(row["End Day"]);
       return new Date(year, month === null ? 0 : month, day === null ? 1 : day);
     }
@@ -948,6 +961,48 @@
 
     function normalizeSubgroupId(value) {
       return String(value == null ? "" : value).trim().toLowerCase();
+    }
+
+    function cleanEnergySource(value) {
+      let str = String(value == null ? "" : value).trim();
+      if (str === "") {
+        return "";
+      }
+
+      if (str.indexOf(",") !== -1) {
+        str = str.split(",")[0].trim();
+      }
+
+      if (str.indexOf("/") !== -1) {
+        const parts = str.split("/");
+        str = parts[parts.length - 1].trim();
+      }
+
+      return str;
+    }
+
+    function cleanParadigm(value) {
+      const str = String(value == null ? "" : value).trim();
+      if (str === "") {
+        return "";
+      }
+
+      let result = "";
+      for (let i = 0; i < str.length; i += 1) {
+        const ch = str[i];
+        if ((ch >= "a" && ch <= "z") || (ch >= "A" && ch <= "Z") || ch === " ") {
+          result += ch;
+        } else {
+          break;
+        }
+      }
+
+      return result.trim();
+    }
+
+    function cellValue(row, columnName) {
+      const raw = row[columnName];
+      return raw == null ? "" : String(raw).trim();
     }
 
     function hashString(value) {
@@ -1053,6 +1108,15 @@
       return counter + 1;
     }
 
+    function normalizeBceDates(items, timelineStart) {
+      for (let i = 0; i < items.length; i += 1) {
+        const item = items[i];
+        if (item.start && item.start._isBce) {
+          item.start = new Date(timelineStart);
+        }
+      }
+    }
+
     function parseTimelineRows(timelineRows) {
       const bounds = { start: null, end: null };
       const titleToSubgroup = {};
@@ -1066,12 +1130,18 @@
       for (let i = 0; i < timelineRows.length; i += 1) {
         const row = timelineRows[i];
         const type = normalizeType(row.Type);
+        const rowId = cellValue(row, "RowId");
+        const title = cellValue(row, "Title");
+
+        if (!type && !rowId && !title) {
+          continue;
+        }
 
         switch (type) {
           case "timeline":
             tryUpdateBounds(parseStartDate(row), parseEndDate(row), bounds);
             break;
-          case "trend":
+          case "energy source":
             trendCounter = addTrendRow(row, titleToSubgroup, trendSubgroups, trendItems, trendCounter);
             break;
           case "paradigm":
@@ -1098,10 +1168,17 @@
 
       for (let i = 0; i < masterRows.length; i += 1) {
         const row = masterRows[i];
-        const trendKey = normalizeSubgroupId(row.Trend);
+        const rawEnergySource = cellValue(row, "Energy Source");
+
+        if (!rawEnergySource) {
+          continue;
+        }
+
+        const cleanedEnergySource = cleanEnergySource(rawEnergySource);
+        const trendKey = normalizeSubgroupId(cleanedEnergySource);
         const subgroup = titleToSubgroup[trendKey] || trendKey;
         const start = parseStartDate(row);
-        const description = String(row.Description == null ? "" : row.Description).trim();
+        const description = cellValue(row, "Event");
 
         if (!subgroup || !start || !description) {
           continue;
@@ -1116,7 +1193,7 @@
           type: "point",
           start,
           title: description,
-          paradigm: String(row.Paradigm == null ? "" : row.Paradigm).trim()
+          paradigm: cleanParadigm(row["Paradigm"])
         });
       }
     }
@@ -1129,6 +1206,9 @@
       const now = new Date();
       const timelineStart = timeline.start || new Date(now.getFullYear() - 100, 0, 1);
       const timelineEnd = timeline.end || now;
+
+      normalizeBceDates(timeline.trendItems, timelineStart);
+      normalizeBceDates(timeline.paradigmItems, timelineStart);
       const span = timelineEnd.getTime() - timelineStart.getTime();
       const bufferFactor = window.innerWidth <= 768 ? 0.02 : 0.01;
       const endWithBuffer = new Date(timelineEnd.getTime() + span * bufferFactor);
@@ -1189,13 +1269,15 @@
           stack: false,
           stackSubgroups: true,
           start: timelineStart,
-          end: endWithBuffer
+          end: endWithBuffer,
+          height: Math.max(timeline.trendSubgroups.size * TREND_ROW_HEIGHT, TREND_ROW_HEIGHT)
         },
         paradigmOptions: {
           stack: false,
           stackSubgroups: true,
           start: timelineStart,
-          end: timelineEnd
+          end: timelineEnd,
+          height: Math.max(timeline.paradigmSubgroups.size * PARADIGM_ROW_HEIGHT, PARADIGM_ROW_HEIGHT)
         },
         masterRowCount: masterRows.length
       };
@@ -1220,7 +1302,7 @@
        return {
          ...baseOptions,
          ...bounds,
-         height: TOP_TIMELINE_HEIGHT + "px",
+          height: (baseOptions.height || TREND_ROW_HEIGHT) + "px",
          zoomMin: 1000 * 60 * 60 * 24 * 365,
          orientation: "bottom",
          verticalScroll: true,
@@ -1245,7 +1327,7 @@
       return {
         ...baseOptions,
         ...bounds,
-        height: BOTTOM_TIMELINE_HEIGHT + "px",
+        height: (baseOptions.height || PARADIGM_ROW_HEIGHTROW_HEIGHT) + "px",
         orientation: "top",
         verticalScroll: true,
         zoomable: true,
