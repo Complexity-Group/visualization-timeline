@@ -81,6 +81,9 @@
       border-bottom: 1px solid var(--border);
       background: rgba(255, 252, 247, 0.92);
       backdrop-filter: blur(10px);
+      transition: opacity 0.28s ease, transform 0.32s ease, max-height 0.36s ease, padding 0.32s ease, border-color 0.28s ease;
+      max-height: 240px;
+      overflow: hidden;
     }
 
     .widget-header {
@@ -250,6 +253,78 @@
       font-size: 0.9rem;
       line-height: 1.2;
       font-weight: 600;
+    }
+
+    .zoom-btn.icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.28rem 0.45rem;
+    }
+
+    .zoom-btn.icon-btn svg {
+      width: 0.95rem;
+      height: 0.95rem;
+      display: block;
+    }
+
+    .floating-controls {
+      display: none;
+    }
+
+    .widget.is-fullscreen .chrome {
+      opacity: 0;
+      transform: translateY(-12px);
+      max-height: 0;
+      padding-top: 0;
+      padding-bottom: 0;
+      border-bottom-color: transparent;
+      pointer-events: none;
+    }
+
+    .widget.is-fullscreen .timeline-stage {
+      border-top-color: transparent;
+    }
+
+    .widget.is-fullscreen .floating-controls {
+      display: flex;
+      position: fixed;
+      top: 0.85rem;
+      right: 0.85rem;
+      z-index: 40;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.4rem;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: rgba(255, 252, 247, 0.94);
+      box-shadow: var(--shadow-md);
+      backdrop-filter: blur(10px);
+      animation: floatIn 0.28s ease;
+    }
+
+    .widget.is-fullscreen .floating-controls .button {
+      box-shadow: none;
+    }
+
+    .widget.is-fullscreen .floating-controls .button.primary {
+      box-shadow: var(--shadow-sm);
+    }
+
+    .fs-enter .timeline-stage,
+    .fs-exit .timeline-stage {
+      transition: flex-basis 0.32s ease, min-height 0.32s ease;
+    }
+
+    @keyframes floatIn {
+      from {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.98);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
     }
 
     .spinner {
@@ -848,6 +923,14 @@
         justify-content: flex-end;
       }
 
+      .widget.is-fullscreen .floating-controls {
+        top: 0.55rem;
+        right: 0.55rem;
+        left: 0.55rem;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
       .timeline-top-shell,
       #timelineTop {
         min-height: 0;
@@ -869,7 +952,7 @@
           <h1 class="widget-title">Energy Timeline</h1>
           <p class="widget-subtitle">Explore historical energy sources, uses, and paradigms across time.</p>
         </div>
-        <div class="controls">
+        <div class="controls header-actions">
           <button class="button" id="shareBtn" type="button" title="Copy a shareable link to the current view">Share view</button>
           <button class="button primary" id="exportBtn" type="button" title="Download the timeline as a JPEG image">Export JPEG</button>
         </div>
@@ -887,12 +970,42 @@
           <span id="statusText">Preparing timeline...</span>
         </div>
 
-        <div class="zoom-controls">
+        <div class="zoom-controls chrome-zoom-controls">
           <button class="button zoom-btn" id="zoomOutBtn" type="button" title="Zoom out">−</button>
           <button class="button zoom-btn" id="zoomInBtn" type="button" title="Zoom in">+</button>
           <button class="button zoom-btn" id="resetZoomBtn" type="button" title="Reset zoom to fit all items">Fit</button>
+          <button class="button zoom-btn icon-btn" id="fullscreenBtn" type="button" title="Enter full screen" aria-pressed="false">
+            <svg class="fs-icon-enter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M8 3H5a2 2 0 0 0-2 2v3"></path>
+              <path d="M16 3h3a2 2 0 0 1 2 2v3"></path>
+              <path d="M8 21H5a2 2 0 0 1-2-2v-3"></path>
+              <path d="M16 21h3a2 2 0 0 0 2-2v-3"></path>
+            </svg>
+            <svg class="fs-icon-exit hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M8 3v3a2 2 0 0 1-2 2H3"></path>
+              <path d="M21 8h-3a2 2 0 0 1-2-2V3"></path>
+              <path d="M3 16h3a2 2 0 0 1 2 2v3"></path>
+              <path d="M16 21v-3a2 2 0 0 1 2-2h3"></path>
+            </svg>
+          </button>
         </div>
       </div>
+    </div>
+
+    <div class="floating-controls" id="floatingControls" aria-hidden="true">
+      <button class="button" id="shareBtnFs" type="button" title="Copy a shareable link to the current view">Share view</button>
+      <button class="button primary" id="exportBtnFs" type="button" title="Download the timeline as a JPEG image">Export JPEG</button>
+      <button class="button zoom-btn" id="zoomOutBtnFs" type="button" title="Zoom out">−</button>
+      <button class="button zoom-btn" id="zoomInBtnFs" type="button" title="Zoom in">+</button>
+      <button class="button zoom-btn" id="resetZoomBtnFs" type="button" title="Reset zoom to fit all items">Fit</button>
+      <button class="button zoom-btn icon-btn" id="fullscreenBtnFs" type="button" title="Exit full screen" aria-pressed="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M8 3v3a2 2 0 0 1-2 2H3"></path>
+          <path d="M21 8h-3a2 2 0 0 1-2-2V3"></path>
+          <path d="M3 16h3a2 2 0 0 1 2 2v3"></path>
+          <path d="M16 21v-3a2 2 0 0 1 2-2h3"></path>
+        </svg>
+      </button>
     </div>
 
     <div class="timeline-stage" id="timelineStage">
@@ -1001,6 +1114,7 @@
     let pendingInitialWindow = null;
 
     const el = {
+      widgetRoot: document.getElementById("widgetRoot"),
       timelineTop: document.getElementById("timelineTop"),
       timelineBottom: document.getElementById("timelineBottom"),
       timelineShell: document.getElementById("timelineShell"),
@@ -1016,11 +1130,22 @@
       zoomInBtn: document.getElementById("zoomInBtn"),
       zoomOutBtn: document.getElementById("zoomOutBtn"),
       resetZoomBtn: document.getElementById("resetZoomBtn"),
+      fullscreenBtn: document.getElementById("fullscreenBtn"),
+      floatingControls: document.getElementById("floatingControls"),
+      shareBtnFs: document.getElementById("shareBtnFs"),
+      exportBtnFs: document.getElementById("exportBtnFs"),
+      zoomInBtnFs: document.getElementById("zoomInBtnFs"),
+      zoomOutBtnFs: document.getElementById("zoomOutBtnFs"),
+      resetZoomBtnFs: document.getElementById("resetZoomBtnFs"),
+      fullscreenBtnFs: document.getElementById("fullscreenBtnFs"),
       modalOverlay: document.getElementById("modalOverlay"),
       modalTitle: document.getElementById("modalTitle"),
       modalBody: document.getElementById("modalBody"),
       modalClose: document.getElementById("modalClose")
     };
+
+    let isFullscreen = false;
+    let fullscreenTransitionTimer = null;
 
     function setLoadingState(message) {
       el.status.classList.remove("hidden", "error");
@@ -1889,11 +2014,22 @@
       return ACTIVE_TAB_KEY;
     }
 
+    function forEachPair(primary, secondary, fn) {
+      if (primary) {
+        fn(primary);
+      }
+      if (secondary) {
+        fn(secondary);
+      }
+    }
+
     async function shareUrl() {
       updateShareUrl();
       const url = window.location.href;
       const originalLabel = el.shareBtn.textContent;
-      el.shareBtn.disabled = true;
+      forEachPair(el.shareBtn, el.shareBtnFs, function (btn) {
+        btn.disabled = true;
+      });
 
       let copied = false;
       try {
@@ -1921,14 +2057,18 @@
         document.body.removeChild(ta);
       }
 
-      el.shareBtn.textContent = copied ? "Link copied" : "Copy failed";
-      if (copied) {
-        el.shareBtn.classList.add("success");
-      }
+      forEachPair(el.shareBtn, el.shareBtnFs, function (btn) {
+        btn.textContent = copied ? "Link copied" : "Copy failed";
+        if (copied) {
+          btn.classList.add("success");
+        }
+      });
       setTimeout(() => {
-        el.shareBtn.textContent = originalLabel;
-        el.shareBtn.classList.remove("success");
-        el.shareBtn.disabled = false;
+        forEachPair(el.shareBtn, el.shareBtnFs, function (btn) {
+          btn.textContent = originalLabel;
+          btn.classList.remove("success");
+          btn.disabled = false;
+        });
       }, 2000);
     }
 
@@ -1936,8 +2076,10 @@
       const top = el.timelineShell;
       const bottom = el.paradigmShell;
       const originalLabel = el.exportBtn.textContent;
-      el.exportBtn.disabled = true;
-      el.exportBtn.textContent = "Exporting…";
+      forEachPair(el.exportBtn, el.exportBtnFs, function (btn) {
+        btn.disabled = true;
+        btn.textContent = "Exporting…";
+      });
       try {
         const options = {
           backgroundColor: getComputedStyle(document.body).backgroundColor || "#ffffff",
@@ -1969,16 +2111,27 @@
         document.body.removeChild(a);
       } catch (error) {
         console.error("Export failed:", error);
-        el.exportBtn.textContent = "Export failed";
-        setTimeout(() => { el.exportBtn.textContent = originalLabel; }, 2000);
+        forEachPair(el.exportBtn, el.exportBtnFs, function (btn) {
+          btn.textContent = "Export failed";
+        });
+        setTimeout(() => {
+          forEachPair(el.exportBtn, el.exportBtnFs, function (btn) {
+            btn.textContent = originalLabel;
+            btn.disabled = false;
+          });
+        }, 2000);
         return;
       }
-      el.exportBtn.textContent = "Saved";
-      el.exportBtn.classList.add("success");
+      forEachPair(el.exportBtn, el.exportBtnFs, function (btn) {
+        btn.textContent = "Saved";
+        btn.classList.add("success");
+      });
       setTimeout(() => {
-        el.exportBtn.textContent = originalLabel;
-        el.exportBtn.classList.remove("success");
-        el.exportBtn.disabled = false;
+        forEachPair(el.exportBtn, el.exportBtnFs, function (btn) {
+          btn.textContent = originalLabel;
+          btn.classList.remove("success");
+          btn.disabled = false;
+        });
       }, 2000);
     }
 
@@ -2108,6 +2261,72 @@
       trendTimelineInstance.fit({ animation: true });
     }
 
+    function updateFullscreenButtonState() {
+      const enterIcon = el.fullscreenBtn ? el.fullscreenBtn.querySelector(".fs-icon-enter") : null;
+      const exitIcon = el.fullscreenBtn ? el.fullscreenBtn.querySelector(".fs-icon-exit") : null;
+
+      if (el.fullscreenBtn) {
+        el.fullscreenBtn.setAttribute("aria-pressed", String(isFullscreen));
+        el.fullscreenBtn.title = isFullscreen ? "Exit full screen" : "Enter full screen";
+        if (enterIcon) {
+          enterIcon.classList.toggle("hidden", isFullscreen);
+        }
+        if (exitIcon) {
+          exitIcon.classList.toggle("hidden", !isFullscreen);
+        }
+      }
+
+      if (el.fullscreenBtnFs) {
+        el.fullscreenBtnFs.setAttribute("aria-pressed", String(isFullscreen));
+        el.fullscreenBtnFs.title = isFullscreen ? "Exit full screen" : "Enter full screen";
+      }
+
+      if (el.floatingControls) {
+        el.floatingControls.setAttribute("aria-hidden", String(!isFullscreen));
+      }
+    }
+
+    function setFullscreenMode(nextFullscreen) {
+      if (!el.widgetRoot || isFullscreen === nextFullscreen) {
+        return;
+      }
+
+      isFullscreen = nextFullscreen;
+      el.widgetRoot.classList.toggle("is-fullscreen", isFullscreen);
+      el.widgetRoot.classList.remove("fs-enter", "fs-exit");
+      el.widgetRoot.classList.add(isFullscreen ? "fs-enter" : "fs-exit");
+      updateFullscreenButtonState();
+      lastAppliedTopHeight = null;
+
+      if (fullscreenTransitionTimer !== null) {
+        clearTimeout(fullscreenTransitionTimer);
+      }
+
+      requestAnimationFrame(function () {
+        scheduleTimelineResize();
+        requestAnimationFrame(function () {
+          applyTopTimelineHeight();
+          if (trendTimelineInstance) {
+            trendTimelineInstance.redraw();
+          }
+          if (paradigmTimelineInstance) {
+            paradigmTimelineInstance.redraw();
+          }
+        });
+      });
+
+      fullscreenTransitionTimer = setTimeout(function () {
+        el.widgetRoot.classList.remove("fs-enter", "fs-exit");
+        fullscreenTransitionTimer = null;
+        lastAppliedTopHeight = null;
+        scheduleTimelineResize();
+      }, 360);
+    }
+
+    function toggleFullscreenMode() {
+      setFullscreenMode(!isFullscreen);
+    }
+
     el.tabs.addEventListener("click", function (event) {
       const tab = event.target.closest(".tab");
       if (!tab) {
@@ -2124,6 +2343,34 @@
     el.zoomInBtn.addEventListener("click", function () { zoomTimeline(0.2); });
     el.zoomOutBtn.addEventListener("click", function () { zoomTimeline(-0.2); });
     el.resetZoomBtn.addEventListener("click", resetTimelineZoom);
+    el.fullscreenBtn.addEventListener("click", toggleFullscreenMode);
+
+    if (el.exportBtnFs) {
+      el.exportBtnFs.addEventListener("click", exportTimelineAsJpeg);
+    }
+    if (el.shareBtnFs) {
+      el.shareBtnFs.addEventListener("click", shareUrl);
+    }
+    if (el.zoomInBtnFs) {
+      el.zoomInBtnFs.addEventListener("click", function () { zoomTimeline(0.2); });
+    }
+    if (el.zoomOutBtnFs) {
+      el.zoomOutBtnFs.addEventListener("click", function () { zoomTimeline(-0.2); });
+    }
+    if (el.resetZoomBtnFs) {
+      el.resetZoomBtnFs.addEventListener("click", resetTimelineZoom);
+    }
+    if (el.fullscreenBtnFs) {
+      el.fullscreenBtnFs.addEventListener("click", toggleFullscreenMode);
+    }
+
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && isFullscreen && el.modalOverlay.classList.contains("hidden")) {
+        setFullscreenMode(false);
+      }
+    });
+
+    updateFullscreenButtonState();
 
     let resizeFrame = null;
     function scheduleTimelineResize() {
