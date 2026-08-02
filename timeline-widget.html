@@ -925,66 +925,40 @@
 
     .skeleton-container {
       display: flex;
-      flex-direction: column;
-      gap: 0;
+      align-items: center;
+      justify-content: center;
       flex: 1 1 auto;
       min-height: 0;
       width: 100%;
+      background: var(--card);
     }
 
-    .skeleton-block {
-      animation: shimmer 2.5s ease-in-out infinite;
-      background-size: 300% 100%;
+    .skeleton-loader {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      padding: 2rem;
     }
 
-    .skeleton-trends {
-      flex: 1 1 auto;
-      min-height: 180px;
-      border-bottom: 1px solid var(--border);
-      background-image: linear-gradient(
-        100deg,
-        #e8e2d6 0%,
-        #efe9dd 35%,
-        rgba(255, 252, 247, 0.95) 50%,
-        #efe9dd 65%,
-        #e8e2d6 100%
-      );
+    .skeleton-spinner {
+      width: 2.5rem;
+      height: 2.5rem;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+      box-sizing: border-box;
     }
 
-    .skeleton-axis {
-      height: 32px;
-      flex: 0 0 auto;
-      background-image: linear-gradient(
-        100deg,
-        #0b5f66 0%,
-        #0b5f66 35%,
-        #1a7a82 50%,
-        #0b5f66 65%,
-        #0b5f66 100%
-      );
-    }
-
-    .skeleton-paradigms {
-      height: 96px;
-      flex: 0 0 auto;
-      border-top: 1px solid var(--border);
-      background-image: linear-gradient(
-        100deg,
-        #e8e2d6 0%,
-        #efe9dd 35%,
-        rgba(255, 252, 247, 0.9) 50%,
-        #efe9dd 65%,
-        #e8e2d6 100%
-      );
-    }
-
-    @keyframes shimmer {
-      0% {
-        background-position: 150% 0;
-      }
-      100% {
-        background-position: -150% 0;
-      }
+    .skeleton-text {
+      margin: 0;
+      font-family: var(--font-sans);
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--muted);
+      letter-spacing: 0.01em;
     }
 
     @media (max-width: 768px) {
@@ -1184,9 +1158,10 @@
 
     <div class="timeline-stage" id="timelineStage">
       <div class="skeleton-container" id="skeleton">
-        <div class="skeleton-block skeleton-trends"></div>
-        <div class="skeleton-block skeleton-axis"></div>
-        <div class="skeleton-block skeleton-paradigms"></div>
+        <div class="skeleton-loader" role="status" aria-live="polite">
+          <div class="skeleton-spinner" aria-hidden="true"></div>
+          <p class="skeleton-text">Loading timeline…</p>
+        </div>
       </div>
 
       <div class="timeline-shell timeline-top-shell hidden" id="timelineShell">
