@@ -525,6 +525,8 @@
       border-right: 1px solid rgba(255, 255, 255, 0.28);
       box-sizing: border-box;
       padding: 7px 6px;
+      overflow: visible;
+      white-space: nowrap;
     }
 
     .vis-panel.vis-top,
@@ -1045,6 +1047,16 @@
       .timeline-bottom-shell,
       #timelineBottom {
         min-height: 0;
+      }
+
+      div.vis-time-axis.vis-foreground {
+        height: 28px !important;
+      }
+
+      div.vis-time-axis.vis-foreground .vis-text {
+        font-size: 11px;
+        padding: 6px 4px;
+        letter-spacing: 0;
       }
     }
   </style>
@@ -1879,28 +1891,29 @@
     function buildTopOptions(baseOptions, timeAxisStep) {
       const bounds = buildBounds(baseOptions);
       const heightPx = getAvailableTopTimelineHeight();
-       return {
-         ...baseOptions,
-         ...bounds,
-          height: heightPx + "px",
-         zoomMin: 1000 * 60 * 60 * 24 * 365,
-         orientation: "bottom",
-         verticalScroll: true,
-         zoomKey: "ctrlKey",
-         margin: {
-           item: {
-             horizontal: 8,
-             vertical: 2
-           },
-           axis: 14
-         },
-         // timeAxis: {
-         //   scale: "year",
-         //   step: timeAxisStep
-         // },
-         groupHeightMode: "fixed",
-         showCurrentTime: false,
-       };
+      const isMobile = window.innerWidth <= 768;
+      return {
+        ...baseOptions,
+        ...bounds,
+        height: heightPx + "px",
+        zoomMin: 1000 * 60 * 60 * 24 * 365,
+        orientation: "bottom",
+        verticalScroll: true,
+        zoomKey: "ctrlKey",
+        margin: {
+          item: {
+            horizontal: 8,
+            vertical: 2
+          },
+          axis: 14
+        },
+        timeAxis: {
+          scale: "year",
+          step: isMobile ? 100 : (timeAxisStep || 50)
+        },
+        groupHeightMode: "fixed",
+        showCurrentTime: false,
+      };
     }
 
     function buildBottomOptions(baseOptions) {
@@ -2011,9 +2024,9 @@
       }
 
       try {
-        trendTimelineInstance = new vis.Timeline(el.timelineTop, trendItems, trendGroups, buildTopOptions(data.trendOptions, 1));
+        trendTimelineInstance = new vis.Timeline(el.timelineTop, trendItems, trendGroups, buildTopOptions(data.trendOptions, 50));
       } catch (error) {
-        trendTimelineInstance = new vis.Timeline(el.timelineTop, trendItems, trendGroups, buildTopOptions(data.trendOptions, 1));
+        trendTimelineInstance = new vis.Timeline(el.timelineTop, trendItems, trendGroups, buildTopOptions(data.trendOptions, 50));
       }
 
       trendTimelineInstance.setWindow(data.trendOptions.start, data.trendOptions.end, { animation: false });
