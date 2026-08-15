@@ -91,7 +91,7 @@
       align-items: flex-start;
       justify-content: space-between;
       gap: 1rem;
-      margin-bottom: 0.65rem;
+      margin-bottom: 0.5rem;
     }
 
     .brand {
@@ -218,10 +218,10 @@
     }
 
     .tab.active {
-      background: var(--card);
-      color: var(--accent-ink);
+      background: var(--accent);
+      color: #f7fffe;
       box-shadow: var(--shadow-sm);
-      border: 1px solid transparent;
+      border: 1px solid var(--accent);
     }
 
     .status {
@@ -469,6 +469,84 @@
       border-top: 1px solid transparent;
     }
 
+    .timeline-title {
+      flex: 0 0 auto;
+      margin: 0;
+      padding: 0.8rem 1rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--card);
+      color: var(--fg);
+      font-family: var(--font-serif);
+      font-size: 1.35rem;
+      font-weight: 700;
+      line-height: 1.25;
+      text-align: center;
+    }
+
+    .timeline-chart-area {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      width: 100%;
+    }
+
+    .timeline-label-rail {
+      flex: 0 0 40px;
+      width: 40px;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--card);
+      border-right: 1px solid var(--border);
+      box-sizing: border-box;
+      color: var(--fg);
+      font-family: var(--font-sans);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-align: center;
+    }
+
+    .timeline-part-label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+
+    .timeline-part-label.vertical span {
+      white-space: nowrap;
+      transform: rotate(-90deg);
+    }
+
+    .timeline-part-label.trends {
+      flex: 1 1 auto;
+      min-height: 0;
+      background: var(--bg-elevated);
+    }
+
+    .timeline-part-label.time {
+      flex: 0 0 34px;
+      height: 34px;
+      background: var(--bg-elevated);
+      padding: 0 4px;
+    }
+
+    .timeline-part-label.paradigms {
+      flex: 0 0 var(--paradigm-label-height, 30px);
+      height: var(--paradigm-label-height, 30px);
+      background: var(--bg-elevated);
+    }
+
+    .timeline-chart-content {
+      flex: 1 1 auto;
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
     .timeline-shell {
       border: none;
       border-radius: 0;
@@ -569,10 +647,15 @@
       line-height: 1.3;
       min-height: 24px;
       box-shadow: inset 0 0 0 1px rgba(255, 252, 247, 0.4);
+      cursor: pointer;
     }
 
     .vis-item.paradigm-range .vis-item-content {
       padding: 5px 10px;
+    }
+
+    .timeline-stage.is-exporting-image .vis-item.paradigm-range {
+      font-size: 1.1rem;
     }
 
     .vis-item.trend-range.trend-color-0 {
@@ -616,7 +699,8 @@
     }
 
     .vis-item.trend-range {
-      background: linear-gradient(var(--trend-line), var(--trend-line)) no-repeat center / 100% 2.5px,
+      --trend-line-center-y: 18px;
+      background: linear-gradient(var(--trend-line), var(--trend-line)) no-repeat center calc(var(--trend-line-center-y) - 1.25px) / 100% 2.5px,
                   transparent !important;
       border: none !important;
       border-color: transparent !important;
@@ -631,26 +715,73 @@
     }
 
     .vis-item.trend-range .vis-item-content {
-      position: relative;
-      top: -2px;
+      position: static;
+      padding: 4px 6px !important;
+      font-family: var(--font-sans);
+      font-weight: 600;
+      font-size: 0.75rem;
+      letter-spacing: 0.01em;
+      overflow: visible;
+      width: 100%;
+      height: 28px;
+    }
+
+    .timeline-stage.is-exporting-image .vis-item.trend-range .vis-item-content {
+      position: static;
       padding: 0 6px !important;
       font-family: var(--font-sans);
       font-weight: 600;
-      font-size: 0.78rem;
+      font-size: 1.1rem;
       letter-spacing: 0.01em;
+      overflow: visible;
+      width: 100%;
+      height: 28px;
+    }
+
+    .trend-title-text {
+      position: relative;
+      top: -2px;
+      white-space: nowrap;
+    }
+
+    .trend-start-year,
+    .trend-end-year {
+      position: absolute;
+      top: var(--trend-line-center-y);
+      transform: translateY(-50%);
+      color: var(--trend-line);
+      font-size: 0.78rem;
+      font-weight: 700;
+      white-space: nowrap;
+      padding-right: 4px;
+    }
+
+    .trend-start-year {
+      right: calc(100% + 10px);
+    }
+
+    .trend-end-year {
+      top: var(--trend-line-center-y);
+      right: auto;
+      bottom: auto;
+      left: calc(100% + 12px);
+      transform: translateY(-50%);
+      z-index: 2;
     }
 
     .vis-item.trend-range.dot-left::before {
       content: "";
       position: absolute;
       left: -5px;
-      top: 50%;
+      top: var(--trend-line-center-y);
       transform: translateY(-50%);
       width: 7px;
       height: 7px;
+      box-sizing: content-box;
       border-radius: 50%;
+      border: 1px solid #d1d5db;
       background: var(--trend-line);
-      box-shadow: 0 0 0 2px #fffcf7, 0 0 0 3px rgba(26, 35, 50, 0.28);
+      box-shadow: none;
       z-index: 1;
     }
 
@@ -658,20 +789,19 @@
       content: "";
       position: absolute;
       right: -5px;
-      top: 50%;
-      transform: translateY(-50%);
+      top: calc(var(--trend-line-center-y) - 5px);
       width: 0;
       height: 0;
-      border-left: 8px solid var(--trend-line);
       border-top: 5px solid transparent;
       border-bottom: 5px solid transparent;
+      border-left: 8px solid var(--trend-line);
     }
 
     .vis-item.trend-range.dot-right::after {
       content: "";
       position: absolute;
       right: -5px;
-      top: 50%;
+      top: var(--trend-line-center-y);
       transform: translateY(-50%);
       width: 7px;
       height: 7px;
@@ -679,6 +809,15 @@
       background: var(--trend-line);
       box-shadow: 0 0 0 2px #fffcf7, 0 0 0 3px rgba(26, 35, 50, 0.28);
       z-index: 1;
+    }
+
+    .timeline-stage.is-exporting-image.is-mobile-export .vis-item.trend-range.dot-left::before,
+    .timeline-stage.is-exporting-image.is-mobile-export .vis-item.trend-range.dot-right::after {
+      top: calc(var(--trend-line-center-y) + 4px);
+    }
+
+    .timeline-stage.is-exporting-image.is-mobile-export .vis-item.trend-range.arrow-right::after {
+      top: calc(var(--trend-line-center-y) - 1px);
     }
 
     .vis-item.vis-background {
@@ -933,6 +1072,17 @@
       background: var(--card);
     }
 
+    .export-loading-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 252, 247, 0.92);
+      backdrop-filter: blur(4px);
+    }
+
     .skeleton-loader {
       display: flex;
       flex-direction: column;
@@ -999,6 +1149,30 @@
 
       .mobile-only.mobile-zoom-floating {
         display: flex;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0;
+        padding: 0.55rem 0.75rem calc(0.55rem + env(safe-area-inset-bottom));
+        border-right: 0;
+        border-bottom: 0;
+        border-left: 0;
+        border-radius: 12px 12px 0 0;
+        box-shadow: 0 -6px 24px rgba(26, 35, 50, 0.12);
+      }
+
+      .mobile-zoom-floating .button {
+        flex: 1 1 0;
+        min-width: 0;
+        border: 0;
+      }
+
+      .timeline-stage {
+        padding-bottom: calc(3.75rem + env(safe-area-inset-bottom));
       }
 
       .widget.is-fullscreen .chrome,
@@ -1021,6 +1195,35 @@
       .timeline-bottom-shell,
       #timelineBottom {
         min-height: 0;
+      }
+
+      .timeline-title {
+        font-size: 0.8rem;
+        padding: 0.45rem 0.65rem;
+      }
+
+      .vis-item.trend-range .vis-item-content {
+        padding: 4px 6px !important;
+        font-size: 0.6rem;
+      }
+
+      .trend-start-year,
+      .trend-end-year {
+        font-size: 0.45rem;
+      }
+
+      .vis-item.trend-range {
+        --trend-line-center-y: 14px;
+      }
+
+      .timeline-label-rail {
+        flex-basis: 32px;
+        width: 32px;
+      }
+
+      .timeline-part-label.time {
+        flex-basis: 30px;
+        height: 30px;
       }
 
       div.vis-time-axis.vis-foreground {
@@ -1065,7 +1268,7 @@
       <div class="widget-header">
         <div class="brand">
           <p class="brand-kicker">Complexity Group • The Complexity and Sustainability of California’s Energy Transformations</p>
-          <h1 class="widget-title">Energy Timeline</h1>
+<!--          <h1 class="widget-title">Energy Timeline</h1>-->
           <p class="widget-subtitle">Explore historical energy sources, uses, and paradigms across time.</p>
         </div>
         <div class="controls header-actions">
@@ -1157,6 +1360,13 @@
     </div>
 
     <div class="timeline-stage" id="timelineStage">
+      <div class="export-loading-overlay hidden" id="exportLoadingOverlay" role="status" aria-live="polite" data-html2canvas-ignore="true">
+        <div class="skeleton-loader">
+          <div class="skeleton-spinner" aria-hidden="true"></div>
+          <p class="skeleton-text">Preparing timeline image…</p>
+        </div>
+      </div>
+
       <div class="skeleton-container" id="skeleton">
         <div class="skeleton-loader" role="status" aria-live="polite">
           <div class="skeleton-spinner" aria-hidden="true"></div>
@@ -1164,11 +1374,21 @@
         </div>
       </div>
 
-      <div class="timeline-shell timeline-top-shell hidden" id="timelineShell">
-        <div id="timelineTop"></div>
-      </div>
-      <div class="timeline-shell timeline-bottom-shell hidden" id="paradigmShell">
-        <div id="timelineBottom"></div>
+      <h2 class="timeline-title hidden" id="timelineTitle"></h2>
+      <div class="timeline-chart-area hidden" id="timelineChartArea">
+        <div class="timeline-label-rail" id="timelineLabelRail" aria-label="Timeline chart sections">
+          <div class="timeline-part-label trends vertical"><span id="trendSectionLabel">Energy Sources</span></div>
+          <div class="timeline-part-label time"><span>Time</span></div>
+          <div class="timeline-part-label paradigms vertical"><span>Paradigm shifts</span></div>
+        </div>
+        <div class="timeline-chart-content">
+          <div class="timeline-shell timeline-top-shell" id="timelineShell">
+            <div id="timelineTop"></div>
+          </div>
+          <div class="timeline-shell timeline-bottom-shell" id="paradigmShell">
+            <div id="timelineBottom"></div>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -1223,7 +1443,7 @@
 
     const DEFAULT_GROUP_ID = "default";
     const PARADIGM_GROUP_ID = "paradigms";
-    const TREND_ROW_HEIGHT = 28;
+    const TREND_ROW_HEIGHT = 40;
     const PARADIGM_ROW_HEIGHT = 30;
     const EVENT_TITLE_MAX = 10;
     const TIMELINE_REQUIRED_HEADERS = [
@@ -1259,8 +1479,11 @@
     let loadGeneration = 0;
     const tabCache = {};
     let currentTrendItems = [];
+    let currentParadigmItems = [];
     let currentTrendOptions = null;
+    let currentParadigmOptions = null;
     let pendingInitialWindow = null;
+    let isExportingImage = false;
 
     const el = {
       widgetRoot: document.getElementById("widgetRoot"),
@@ -1269,6 +1492,11 @@
       timelineShell: document.getElementById("timelineShell"),
       paradigmShell: document.getElementById("paradigmShell"),
       timelineStage: document.getElementById("timelineStage"),
+      timelineTitle: document.getElementById("timelineTitle"),
+      timelineChartArea: document.getElementById("timelineChartArea"),
+      timelineLabelRail: document.getElementById("timelineLabelRail"),
+      trendSectionLabel: document.getElementById("trendSectionLabel"),
+      exportLoadingOverlay: document.getElementById("exportLoadingOverlay"),
       tabs: document.getElementById("tabs"),
       status: document.getElementById("status"),
       statusText: document.getElementById("statusText"),
@@ -1307,8 +1535,8 @@
       el.spinner.classList.remove("hidden");
       el.statusText.textContent = message;
       el.skeleton.classList.remove("hidden");
-      el.timelineShell.classList.add("hidden");
-      el.paradigmShell.classList.add("hidden");
+      el.timelineTitle.classList.add("hidden");
+      el.timelineChartArea.classList.add("hidden");
     }
 
     function setReadyState(message) {
@@ -1316,8 +1544,8 @@
       el.spinner.classList.add("hidden");
       el.statusText.textContent = message;
       el.skeleton.classList.add("hidden");
-      el.timelineShell.classList.remove("hidden");
-      el.paradigmShell.classList.remove("hidden");
+      el.timelineTitle.classList.remove("hidden");
+      el.timelineChartArea.classList.remove("hidden");
     }
 
     function setErrorState(message) {
@@ -1326,8 +1554,8 @@
       el.spinner.classList.add("hidden");
       el.statusText.textContent = message;
       el.skeleton.classList.add("hidden");
-      el.timelineShell.classList.add("hidden");
-      el.paradigmShell.classList.add("hidden");
+      el.timelineTitle.classList.add("hidden");
+      el.timelineChartArea.classList.add("hidden");
     }
 
     function csvUrl(sheetName, config) {
@@ -1563,6 +1791,10 @@
       return new Promise((resolve) => setTimeout(resolve, 0));
     }
 
+    function nextAnimationFrame() {
+      return new Promise((resolve) => requestAnimationFrame(resolve));
+    }
+
     function tryUpdateBounds(startInfo, endInfo, bounds) {
       if (startInfo && !startInfo.isBce && (!bounds.start || startInfo.date < bounds.start)) {
         bounds.start = startInfo.date;
@@ -1592,6 +1824,13 @@
       }
 
       const endInfo = parseEndDate(row);
+      const startYearLabel = startInfo.raw || String(startInfo.date.getFullYear());
+      const hasDistinctEnd = Boolean(
+        endInfo &&
+        endInfo.raw &&
+        endInfo.date.getTime() !== startInfo.date.getTime()
+      );
+      const endYearLabel = hasDistinctEnd ? endInfo.raw : "";
 
       items.push({
         id: "trend-" + counter,
@@ -1605,6 +1844,10 @@
         endRaw: endInfo ? endInfo.raw : "",
         startIsBce: startInfo.isBce,
         endIsBce: endInfo ? endInfo.isBce : false,
+        startYearLabel,
+        endYearLabel,
+        titleText: title,
+        displayTitleText: title,
         content: title
       });
 
@@ -1622,6 +1865,11 @@
       subgroups.add(subgroup);
 
       const endInfo = parseEndDate(row);
+      const startYearLabel = startInfo.raw || String(startInfo.date.getFullYear());
+      const endYearLabel = endInfo
+        ? (endInfo.raw || String(endInfo.date.getFullYear()))
+        : String(new Date().getFullYear());
+      const paradigmTitle = title || "Paradigm";
 
       items.push({
         id: "paradigm-" + counter,
@@ -1635,7 +1883,8 @@
         endRaw: endInfo ? endInfo.raw : "",
         startIsBce: startInfo.isBce,
         endIsBce: endInfo ? endInfo.isBce : false,
-        content: title || "Paradigm"
+        titleText: paradigmTitle,
+        content: escapeHtml(paradigmTitle) + " (" + escapeHtml(startYearLabel) + "-" + escapeHtml(endYearLabel) + ")"
       });
 
       return counter + 1;
@@ -1655,6 +1904,7 @@
 
     function parseTimelineRows(timelineRows, config) {
       const bounds = { start: null, end: null };
+      let timelineTitle = "";
       const titleToSubgroup = {};
       const trendSubgroups = new Set();
       const trendItems = [];
@@ -1676,6 +1926,9 @@
         switch (type) {
           case "timeline":
             tryUpdateBounds(parseStartDate(row), parseEndDate(row), bounds);
+            if (!timelineTitle && title) {
+              timelineTitle = title;
+            }
             break;
           case config.trendType:
             trendCounter = addTrendRow(row, titleToSubgroup, trendSubgroups, trendItems, trendCounter);
@@ -1691,6 +1944,7 @@
       return {
         start: bounds.start,
         end: bounds.end,
+        title: timelineTitle,
         titleToSubgroup,
         trendSubgroups,
         trendItems,
@@ -1797,7 +2051,8 @@
       for (let i = 0; i < timeline.trendItems.length; i += 1) {
         const item = timeline.trendItems[i];
         if (item.type === "range" && eventCounts[item.subgroup]) {
-          item.content += " (" + eventCounts[item.subgroup] + ")";
+          item.displayTitleText = item.titleText + " (" + eventCounts[item.subgroup] + ")";
+          item.content = item.displayTitleText;
         }
       }
 
@@ -1806,6 +2061,7 @@
       const paradigmHeight = Math.max(timeline.paradigmSubgroups.size * PARADIGM_ROW_HEIGHT, PARADIGM_ROW_HEIGHT);
 
       return {
+        title: timeline.title || config.label,
         trendGroups: [createGroupWithSubgroups(DEFAULT_GROUP_ID, Array.from(timeline.trendSubgroups))],
         paradigmGroups: [createGroupWithSubgroups(PARADIGM_GROUP_ID, Array.from(timeline.paradigmSubgroups))],
         trendItems: timeline.trendItems,
@@ -1863,6 +2119,34 @@
       return Math.max(stageHeight - paradigmHeight, TREND_ROW_HEIGHT * 4);
     }
 
+    function buildTrendItemTemplate(item) {
+      if (!item || item.type !== "range") {
+        return item ? (item.content || item.title || "") : "";
+      }
+
+      const wrapper = document.createElement("span");
+      wrapper.className = "trend-content";
+
+      const startYear = document.createElement("span");
+      startYear.className = "trend-start-year";
+      startYear.textContent = (item.startYearLabel || "");
+      wrapper.appendChild(startYear);
+
+      const title = document.createElement("span");
+      title.className = "trend-title-text";
+      title.textContent = item.displayTitleText || item.titleText || item.content || "";
+      wrapper.appendChild(title);
+
+      if (item.endYearLabel) {
+        const endYear = document.createElement("span");
+        endYear.className = "trend-end-year";
+        endYear.textContent = item.endYearLabel;
+        wrapper.appendChild(endYear);
+      }
+
+      return wrapper;
+    }
+
     function buildTopOptions(baseOptions, timeAxisStep) {
       const bounds = buildBounds(baseOptions);
       const heightPx = getAvailableTopTimelineHeight();
@@ -1888,6 +2172,7 @@
         },
         groupHeightMode: "fixed",
         showCurrentTime: false,
+        template: buildTrendItemTemplate,
       };
     }
 
@@ -1938,7 +2223,7 @@
 
       function wire(source, target) {
         source.on("rangechange", (props) => {
-          if (isSyncing) {
+          if (isSyncing || isExportingImage) {
             return;
           }
 
@@ -1953,7 +2238,7 @@
      }
 
     function refreshVisibleTimelines() {
-      if (!trendTimelineInstance || !paradigmTimelineInstance) {
+      if (isExportingImage || !trendTimelineInstance || !paradigmTimelineInstance) {
         return;
       }
 
@@ -1981,10 +2266,37 @@
       });
     }
 
+    function anchorTrendEndpointYears() {
+      const ranges = el.timelineTop.querySelectorAll(".vis-item.trend-range");
+      for (let i = 0; i < ranges.length; i += 1) {
+        const range = ranges[i];
+        const startYear = range.querySelector(".trend-start-year");
+        const endYear = range.querySelector(".trend-end-year");
+
+        // vis-timeline nests item content in a shrink-to-fit wrapper. Moving the
+        // endpoint labels to the range itself makes 100% mean the full arrow length.
+        if (startYear && startYear.parentElement !== range) {
+          range.appendChild(startYear);
+        }
+        if (endYear && endYear.parentElement !== range) {
+          range.appendChild(endYear);
+        }
+      }
+    }
+
+    function scheduleTrendEndpointAnchoring() {
+      requestAnimationFrame(anchorTrendEndpointYears);
+    }
+
     function renderTimeline(data) {
       currentTrendItems = data.trendItems;
+      currentParadigmItems = data.paradigmItems;
       currentTrendOptions = data.trendOptions;
+      currentParadigmOptions = data.paradigmOptions;
       lastAppliedTopHeight = null;
+      el.timelineTitle.textContent = data.title;
+      el.trendSectionLabel.textContent = TIMELINE_CONFIGS[activeTabKey].label;
+      el.timelineLabelRail.style.setProperty("--paradigm-label-height", data.paradigmOptions.height + "px");
 
       const trendItems = new vis.DataSet(data.trendItems);
       const trendGroups = new vis.DataSet(data.trendGroups);
@@ -2007,7 +2319,12 @@
       trendTimelineInstance.setWindow(data.trendOptions.start, data.trendOptions.end, { animation: false });
 
       attachTrendClickHandler(trendTimelineInstance);
-      trendTimelineInstance.on("rangechanged", updateShareUrl);
+      trendTimelineInstance.on("changed", scheduleTrendEndpointAnchoring);
+      trendTimelineInstance.on("rangechanged", function () {
+        updateShareUrl();
+        scheduleTrendEndpointAnchoring();
+      });
+      scheduleTrendEndpointAnchoring();
 
       paradigmTimelineInstance = new vis.Timeline(
         el.timelineBottom,
@@ -2073,16 +2390,12 @@
       return 0;
     }
 
-    function showModal(trendTitle, subgroup) {
-      const events = currentTrendItems.filter(function (item) {
-        return item.type === "point" && item.subgroup === subgroup;
-      });
-
+    function showEventsModal(title, events, emptyMessage) {
       events.sort(function (a, b) {
         return eventSortKey(a) - eventSortKey(b);
       });
 
-      let titleHtml = escapeHtml(trendTitle);
+      let titleHtml = escapeHtml(title);
       if (events.length > 0) {
         const minEvt = events[0];
         const maxEvt = events[events.length - 1];
@@ -2097,7 +2410,7 @@
       el.modalTitle.innerHTML = titleHtml;
 
       if (events.length === 0) {
-        el.modalBody.innerHTML = '<div class="event-empty">No events recorded for this trend.</div>';
+        el.modalBody.innerHTML = '<div class="event-empty">' + escapeHtml(emptyMessage || "No events recorded.") + '</div>';
       } else {
         let html = '<div class="event-timeline">';
         for (let i = 0; i < events.length; i += 1) {
@@ -2125,6 +2438,21 @@
 
       el.modalOverlay.classList.remove("hidden");
       document.body.style.overflow = "hidden";
+    }
+
+    function showTrendModal(trendTitle, subgroup) {
+      const events = currentTrendItems.filter(function (item) {
+        return item.type === "point" && item.subgroup === subgroup;
+      });
+      showEventsModal(trendTitle, events, "No events recorded for this trend.");
+    }
+
+    function showParadigmModal(paradigmTitle) {
+      const paradigmKey = normalizeSubgroupId(cleanParadigm(paradigmTitle));
+      const events = currentTrendItems.filter(function (item) {
+        return item.type === "point" && normalizeSubgroupId(item.paradigm) === paradigmKey;
+      });
+      showEventsModal(paradigmTitle, events, "No events recorded for this paradigm.");
     }
 
     function hideModal() {
@@ -2173,7 +2501,7 @@
           return;
         }
 
-        showModal(clickedItem.content, clickedItem.subgroup);
+        showTrendModal(clickedItem.titleText || clickedItem.content, clickedItem.subgroup);
       });
     }
 
@@ -2183,7 +2511,17 @@
           return;
         }
 
-        timelineInstance.focus(props.item, { animation: true, zoom: true });
+        let clickedItem = null;
+        for (let i = 0; i < currentParadigmItems.length; i += 1) {
+          if (currentParadigmItems[i].id === props.item) {
+            clickedItem = currentParadigmItems[i];
+            break;
+          }
+        }
+
+        if (clickedItem) {
+          showParadigmModal(clickedItem.titleText || clickedItem.content);
+        }
       });
     }
 
@@ -2319,36 +2657,170 @@
     }
 
     async function exportTimelineAsJpeg() {
-      const top = el.timelineShell;
-      const bottom = el.paradigmShell;
       const buttons = getExportButtons();
       const originalLabels = buttons.map(function (btn) { return btn.textContent; });
+      let exportState = null;
+      let exportSucceeded = false;
       forEachButton(buttons, function (btn) {
         btn.disabled = true;
         setButtonText(btn, "Exporting…");
       });
+      el.exportLoadingOverlay.classList.remove("hidden");
+      el.timelineStage.setAttribute("aria-busy", "true");
       try {
+        await nextAnimationFrame();
+
+        if (!trendTimelineInstance || !paradigmTimelineInstance || !currentTrendOptions || !currentParadigmOptions) {
+          throw new Error("Timeline is not ready to export.");
+        }
+
+        const originalStageRect = el.timelineStage.getBoundingClientRect();
+        const originalWidths = {
+          stage: Math.ceil(originalStageRect.width),
+          chartArea: Math.ceil(el.timelineChartArea.getBoundingClientRect().width),
+          timelineShell: Math.ceil(el.timelineShell.getBoundingClientRect().width),
+          paradigmShell: Math.ceil(el.paradigmShell.getBoundingClientRect().width),
+          timelineTop: Math.ceil(el.timelineTop.getBoundingClientRect().width),
+          timelineBottom: Math.ceil(el.timelineBottom.getBoundingClientRect().width)
+        };
+        const originalTimelineWidth = originalWidths.stage;
+        const isMobileExport = window.innerWidth <= 768;
+        const targetExportWidth = isMobileExport ? 1080 : originalTimelineWidth;
+        const exportRailWidth = isMobileExport ? 40 : Math.max(originalWidths.stage - originalWidths.timelineShell, 0);
+        const exportTimelineWidth = targetExportWidth - exportRailWidth;
+        const exportWidths = {
+          stage: targetExportWidth,
+          chartArea: targetExportWidth,
+          timelineShell: exportTimelineWidth,
+          paradigmShell: exportTimelineWidth,
+          timelineTop: exportTimelineWidth,
+          timelineBottom: exportTimelineWidth
+        };
+        const styledElements = [
+          el.timelineStage,
+          el.timelineChartArea,
+          el.timelineShell,
+          el.paradigmShell,
+          el.timelineTop,
+          el.timelineBottom,
+          el.exportLoadingOverlay
+        ];
+        exportState = {
+          inlineStyles: styledElements.map(function (element) {
+            return { element, style: element.getAttribute("style") };
+          }),
+          originalTimelineWidth,
+          trendWindow: trendTimelineInstance.getWindow(),
+          paradigmWindow: paradigmTimelineInstance.getWindow()
+        };
+
+        el.exportLoadingOverlay.style.position = "fixed";
+        el.exportLoadingOverlay.style.top = originalStageRect.top + "px";
+        el.exportLoadingOverlay.style.left = originalStageRect.left + "px";
+        el.exportLoadingOverlay.style.width = originalStageRect.width + "px";
+        el.exportLoadingOverlay.style.height = originalStageRect.height + "px";
+        isExportingImage = true;
+        el.timelineStage.classList.add("is-exporting-image");
+        el.timelineStage.classList.toggle("is-mobile-export", isMobileExport);
+
+        const trendRangeCount = currentTrendItems.filter(function (item) {
+          return item.type === "range";
+        }).length;
+        const fullTrendHeight = Math.max(trendRangeCount * 28 + 80, 78);
+        const paradigmRangeCount = currentParadigmItems.filter(function (item) {
+          return item.type === "range";
+        }).length;
+        const fullParadigmHeight = Math.max(paradigmRangeCount * 24 + 50, 76);
+        const fullChartHeight = fullTrendHeight + fullParadigmHeight;
+        const titleHeight = Math.ceil(el.timelineTitle.getBoundingClientRect().height);
+
+        el.timelineStage.style.flex = "0 0 auto";
+        el.timelineStage.style.width = exportWidths.stage + "px";
+        el.timelineStage.style.maxWidth = "none";
+        el.timelineStage.style.height = (titleHeight + fullChartHeight) + "px";
+        el.timelineStage.style.minHeight = "0";
+        el.timelineStage.style.paddingBottom = "0";
+        el.timelineStage.style.overflow = "visible";
+        el.timelineChartArea.style.flex = "0 0 auto";
+        el.timelineChartArea.style.width = exportWidths.chartArea + "px";
+        el.timelineChartArea.style.height = fullChartHeight + "px";
+        el.timelineShell.style.flex = "0 0 auto";
+        el.timelineShell.style.width = exportWidths.timelineShell + "px";
+        el.timelineShell.style.height = fullTrendHeight + "px";
+        el.paradigmShell.style.flex = "0 0 auto";
+        el.paradigmShell.style.width = exportWidths.paradigmShell + "px";
+        el.paradigmShell.style.height = fullParadigmHeight + "px";
+        el.timelineTop.style.width = exportWidths.timelineTop + "px";
+        el.timelineBottom.style.width = exportWidths.timelineBottom + "px";
+
+        const exportStart = new Date(currentParadigmOptions.start);
+        const exactExportEnd = new Date(currentParadigmOptions.end);
+        const exportSpan = Math.max(exactExportEnd.getTime() - exportStart.getTime(), 1);
+        const rightPaddingPixels = 24;
+        const rightPaddingRatio = rightPaddingPixels / Math.max(exportWidths.timelineTop - rightPaddingPixels, 1);
+        const exportEnd = new Date(exactExportEnd.getTime() + exportSpan * rightPaddingRatio);
+
+        trendTimelineInstance.setOptions({
+          height: fullTrendHeight + "px",
+          verticalScroll: false,
+          groupHeightMode: "fitItems",
+          min: exportStart,
+          max: exportEnd
+        });
+        paradigmTimelineInstance.setOptions({
+          height: fullParadigmHeight + "px",
+          min: exportStart,
+          max: exactExportEnd
+        });
+
+        // Height changes can make vis-timeline recalculate its root width.
+        // Reapply the on-screen widths before the export redraw.
+        el.timelineStage.style.width = exportWidths.stage + "px";
+        el.timelineChartArea.style.width = exportWidths.chartArea + "px";
+        el.timelineShell.style.width = exportWidths.timelineShell + "px";
+        el.paradigmShell.style.width = exportWidths.paradigmShell + "px";
+        el.timelineTop.style.width = exportWidths.timelineTop + "px";
+        el.timelineBottom.style.width = exportWidths.timelineBottom + "px";
+
+        trendTimelineInstance.redraw();
+        paradigmTimelineInstance.redraw();
+        trendTimelineInstance.setWindow(exportStart, exportEnd, { animation: false });
+        paradigmTimelineInstance.setWindow(exportStart, exactExportEnd, { animation: false });
+
+        await nextAnimationFrame();
+        await nextAnimationFrame();
+        anchorTrendEndpointYears();
+
         const options = {
           backgroundColor: getComputedStyle(document.body).backgroundColor || "#ffffff",
-          scale: 2,
+          scale: 1,
+          width: targetExportWidth,
+          windowWidth: targetExportWidth,
           useCORS: true,
           logging: false
         };
-        const topCanvas = await html2canvas(top, options);
-        const bottomCanvas = await html2canvas(bottom, options);
-
-        const width = Math.max(topCanvas.width, bottomCanvas.width);
-        const height = topCanvas.height + bottomCanvas.height;
-        const combined = document.createElement("canvas");
-        combined.width = width;
-        combined.height = height;
-        const ctx = combined.getContext("2d");
-        ctx.fillStyle = options.backgroundColor;
-        ctx.fillRect(0, 0, width, height);
-        ctx.drawImage(topCanvas, 0, 0);
-        ctx.drawImage(bottomCanvas, 0, topCanvas.height);
-
-        const jpegUrl = combined.toDataURL("image/jpeg", 0.92);
+        const timelineCanvas = await html2canvas(el.timelineStage, options);
+        let exportCanvas = timelineCanvas;
+        if (timelineCanvas.width !== targetExportWidth) {
+          exportCanvas = document.createElement("canvas");
+          exportCanvas.width = targetExportWidth;
+          exportCanvas.height = Math.round(
+            timelineCanvas.height * (targetExportWidth / timelineCanvas.width)
+          );
+          const exportContext = exportCanvas.getContext("2d");
+          exportContext.drawImage(
+            timelineCanvas,
+            0,
+            0,
+            timelineCanvas.width,
+            timelineCanvas.height,
+            0,
+            0,
+            exportCanvas.width,
+            exportCanvas.height
+          );
+        }
+        const jpegUrl = exportCanvas.toDataURL("image/jpeg", 0.92);
         const a = document.createElement("a");
         const stamp = new Date().toISOString().replace(/[:T]/g, "-").slice(0, 19);
         a.href = jpegUrl;
@@ -2356,22 +2828,52 @@
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
+        exportSucceeded = true;
       } catch (error) {
         console.error("Export failed:", error);
-        forEachButton(buttons, function (btn) {
-          setButtonText(btn, "Export failed");
-        });
-        setTimeout(() => {
-          forEachButton(buttons, function (btn, idx) {
-            setButtonText(btn, originalLabels[idx]);
-            btn.disabled = false;
-          });
-        }, 2000);
-        return;
+      } finally {
+        try {
+          if (exportState) {
+            for (let i = 0; i < exportState.inlineStyles.length; i += 1) {
+              const entry = exportState.inlineStyles[i];
+              if (entry.style === null) {
+                entry.element.removeAttribute("style");
+              } else {
+                entry.element.setAttribute("style", entry.style);
+              }
+            }
+
+            const trendBounds = buildBounds(currentTrendOptions);
+            const paradigmBounds = buildBounds(currentParadigmOptions);
+            lastAppliedTopHeight = null;
+            trendTimelineInstance.setOptions({
+              ...trendBounds,
+              height: getAvailableTopTimelineHeight() + "px",
+              verticalScroll: true,
+              groupHeightMode: "fixed"
+            });
+            paradigmTimelineInstance.setOptions({
+              ...paradigmBounds,
+              height: (currentParadigmOptions.height || PARADIGM_ROW_HEIGHT) + "px"
+            });
+            trendTimelineInstance.redraw();
+            paradigmTimelineInstance.redraw();
+            trendTimelineInstance.setWindow(exportState.trendWindow.start, exportState.trendWindow.end, { animation: false });
+            paradigmTimelineInstance.setWindow(exportState.paradigmWindow.start, exportState.paradigmWindow.end, { animation: false });
+            await nextAnimationFrame();
+            anchorTrendEndpointYears();
+          }
+        } finally {
+          isExportingImage = false;
+          el.timelineStage.classList.remove("is-exporting-image");
+          el.timelineStage.classList.remove("is-mobile-export");
+          el.exportLoadingOverlay.classList.add("hidden");
+          el.timelineStage.removeAttribute("aria-busy");
+        }
       }
       forEachButton(buttons, function (btn) {
-        setButtonText(btn, "Saved");
-        btn.classList.add("success");
+        setButtonText(btn, exportSucceeded ? "Saved" : "Export failed");
+        btn.classList.toggle("success", exportSucceeded);
       });
       setTimeout(() => {
         forEachButton(buttons, function (btn, idx) {
