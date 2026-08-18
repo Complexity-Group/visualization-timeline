@@ -4,9 +4,6 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Sustainability Timeline</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/vis-timeline/styles/vis-timeline-graph2d.min.css">
   <style>
     :root {
@@ -35,12 +32,13 @@
       --shadow-md: 0 8px 28px rgba(26, 35, 50, 0.08);
       --header-h: auto;
       --radius: 8px;
-      --font-sans: "IBM Plex Sans", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      --font-serif: "Source Serif 4", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+      --font-sans: Arial, Helvetica, sans-serif;
+      --font-serif: Arial, Helvetica, sans-serif;
     }
 
     * {
       box-sizing: border-box;
+      font-family: Arial, Helvetica, sans-serif;
     }
 
     html, body {
@@ -507,6 +505,14 @@
       text-align: center;
     }
 
+    .timeline-stage.is-exporting-image .timeline-label-rail {
+      font-size: 1.4rem;
+    }
+
+    .timeline-stage.is-exporting-image .timeline-part-label.time {
+      font-size: 1rem;
+    }
+
     .timeline-part-label {
       display: flex;
       align-items: center;
@@ -596,7 +602,7 @@
 
     div.vis-time-axis.vis-foreground .vis-text {
       font-family: var(--font-sans);
-      font-size: 12px;
+      font-size: 15px;
       font-weight: 500;
       letter-spacing: 0.02em;
       color: #f7fffe;
@@ -605,6 +611,10 @@
       padding: 7px 6px;
       overflow: visible;
       white-space: nowrap;
+    }
+
+    .timeline-stage.is-exporting-image div.vis-time-axis.vis-foreground .vis-text {
+      font-size: 1.2rem;
     }
 
     .vis-panel.vis-top,
@@ -655,7 +665,18 @@
     }
 
     .timeline-stage.is-exporting-image .vis-item.paradigm-range {
-      font-size: 1.1rem;
+      font-size: 1.4rem;
+      min-height: 48px;
+    }
+
+    .timeline-stage.is-exporting-image .vis-item.paradigm-range .vis-item-content {
+      position: static !important;
+      display: flex;
+      align-items: center;
+      width: 100%;
+      min-height: 48px;
+      padding: 6px 10px;
+      transform: none !important;
     }
 
     .vis-item.trend-range.trend-color-0 {
@@ -714,6 +735,11 @@
       filter: brightness(0.92) saturate(1.15);
     }
 
+    .timeline-stage.is-exporting-image .vis-item.trend-range {
+      --trend-line-center-y: 36px;
+      min-height: 48px !important;
+    }
+
     .vis-item.trend-range .vis-item-content {
       position: static;
       padding: 4px 6px !important;
@@ -728,20 +754,28 @@
 
     .timeline-stage.is-exporting-image .vis-item.trend-range .vis-item-content {
       position: static;
-      padding: 0 6px !important;
+      padding: 0 20px !important;
       font-family: var(--font-sans);
       font-weight: 600;
-      font-size: 1.1rem;
+      font-size: 1.8rem;
       letter-spacing: 0.01em;
       overflow: visible;
       width: 100%;
-      height: 28px;
+      height: 48px;
     }
 
     .trend-title-text {
       position: relative;
       top: -2px;
       white-space: nowrap;
+    }
+
+    .timeline-stage.is-exporting-image .trend-title-text {
+      position: absolute;
+      top: auto;
+      bottom: calc(100% - var(--trend-line-center-y) + 6px);
+      left: 20px;
+      line-height: 1.1;
     }
 
     .trend-start-year,
@@ -767,6 +801,11 @@
       left: calc(100% + 12px);
       transform: translateY(-50%);
       z-index: 2;
+    }
+
+    .timeline-stage.is-exporting-image .trend-start-year,
+    .timeline-stage.is-exporting-image .trend-end-year {
+      font-size: 1.4rem;
     }
 
     .vis-item.trend-range.dot-left::before {
@@ -1774,7 +1813,7 @@
       return text.slice(0, EVENT_TITLE_MAX) + "...";
     }
 
-    function createGroupWithSubgroups(groupId, subgroupIds) {
+    function createGroupWithSubgroups(groupId, subgroupIds, subgroupOrderer) {
       const subgroupStack = {};
       for (let i = 0; i < subgroupIds.length; i += 1) {
         subgroupStack[subgroupIds[i]] = false;
@@ -1783,8 +1822,70 @@
       return {
         id: groupId,
         content: "",
+        subgroupOrder: subgroupOrderer || compareSubgroupsByDuration,
         subgroupStack
       };
+    }
+
+    function compareSubgroupsByDuration(first, second) {
+      const durationDifference = second.subgroupDuration - first.subgroupDuration;
+      if (durationDifference !== 0) {
+        return durationDifference;
+      }
+
+      return String(first.subgroupTitle).localeCompare(String(second.subgroupTitle), undefined, {
+        sensitivity: "base"
+      });
+    }
+
+    function compareTopTimelineSubgroups(first, second) {
+      return compareSubgroupsByDuration(second, first);
+    }
+
+    function orderSubgroupsByDuration(subgroupIds, items) {
+      const summaries = {};
+
+      subgroupIds.forEach(function (subgroupId) {
+        summaries[subgroupId] = {
+          earliestStart: Infinity,
+          latestEnd: -Infinity,
+          duration: 0,
+          title: subgroupId
+        };
+      });
+
+      items.forEach(function (item) {
+        if (item.type !== "range" || !item.subgroup || !summaries[item.subgroup]) {
+          return;
+        }
+
+        const summary = summaries[item.subgroup];
+        summary.earliestStart = Math.min(summary.earliestStart, item.start.getTime());
+        summary.latestEnd = Math.max(summary.latestEnd, item.end.getTime());
+        summary.duration = Math.max(summary.latestEnd - summary.earliestStart, 0);
+        summary.title = item.titleText || item.content || item.subgroup;
+      });
+
+      items.forEach(function (item) {
+        const summary = item.subgroup ? summaries[item.subgroup] : null;
+        if (summary) {
+          item.subgroupDuration = summary.duration;
+          item.subgroupTitle = summary.title;
+        }
+      });
+
+      return Array.from(subgroupIds).sort(function (firstId, secondId) {
+        return compareSubgroupsByDuration(
+          {
+            subgroupDuration: summaries[firstId].duration,
+            subgroupTitle: summaries[firstId].title
+          },
+          {
+            subgroupDuration: summaries[secondId].duration,
+            subgroupTitle: summaries[secondId].title
+          }
+        );
+      });
     }
 
     function nextTick() {
@@ -2040,21 +2141,14 @@
         }
       }
 
-      // Add event count badges to trend range items
-      const eventCounts = {};
-      for (let i = 0; i < timeline.trendItems.length; i += 1) {
-        const item = timeline.trendItems[i];
-        if (item.type === "point" && item.subgroup) {
-          eventCounts[item.subgroup] = (eventCounts[item.subgroup] || 0) + 1;
-        }
-      }
-      for (let i = 0; i < timeline.trendItems.length; i += 1) {
-        const item = timeline.trendItems[i];
-        if (item.type === "range" && eventCounts[item.subgroup]) {
-          item.displayTitleText = item.titleText + " (" + eventCounts[item.subgroup] + ")";
-          item.content = item.displayTitleText;
-        }
-      }
+      const orderedTrendSubgroups = orderSubgroupsByDuration(
+        timeline.trendSubgroups,
+        timeline.trendItems
+      );
+      const orderedParadigmSubgroups = orderSubgroupsByDuration(
+        timeline.paradigmSubgroups,
+        timeline.paradigmItems
+      );
 
       console.log('timeline height', timeline.trendSubgroups.size * TREND_ROW_HEIGHT);
 
@@ -2062,8 +2156,14 @@
 
       return {
         title: timeline.title || config.label,
-        trendGroups: [createGroupWithSubgroups(DEFAULT_GROUP_ID, Array.from(timeline.trendSubgroups))],
-        paradigmGroups: [createGroupWithSubgroups(PARADIGM_GROUP_ID, Array.from(timeline.paradigmSubgroups))],
+        // The top timeline is bottom-oriented, so reverse its subgroup comparator
+        // to make the desired order read correctly from top to bottom on screen.
+        trendGroups: [createGroupWithSubgroups(
+          DEFAULT_GROUP_ID,
+          orderedTrendSubgroups,
+          compareTopTimelineSubgroups
+        )],
+        paradigmGroups: [createGroupWithSubgroups(PARADIGM_GROUP_ID, orderedParadigmSubgroups)],
         trendItems: timeline.trendItems,
         paradigmItems: timeline.paradigmItems,
         trendOptions: {
@@ -2173,6 +2273,7 @@
         groupHeightMode: "fixed",
         showCurrentTime: false,
         template: buildTrendItemTemplate,
+        onInitialDrawComplete: scheduleInitialTopTimelineScroll,
       };
     }
 
@@ -2262,6 +2363,7 @@
 
           const topWindow = trendTimelineInstance.getWindow();
           paradigmTimelineInstance.setWindow(topWindow.start, topWindow.end, { animation: false });
+          scheduleInitialTopTimelineScroll();
         });
       });
     }
@@ -2286,6 +2388,31 @@
 
     function scheduleTrendEndpointAnchoring() {
       requestAnimationFrame(anchorTrendEndpointYears);
+    }
+
+    function scrollTopTimelineToFirstRow() {
+      if (!trendTimelineInstance) {
+        return;
+      }
+
+      // vis-timeline stores vertical position as an internal negative offset;
+      // the center panel itself is not a native scrolling element.
+      if (typeof trendTimelineInstance._setScrollTop === "function") {
+        trendTimelineInstance._setScrollTop(0);
+        trendTimelineInstance.redraw();
+        return;
+      }
+
+      const sideScrollPanel = el.timelineTop.querySelector(".vis-panel.vis-left.vis-vertical-scroll");
+      if (sideScrollPanel) {
+        sideScrollPanel.scrollTop = 0;
+      }
+    }
+
+    function scheduleInitialTopTimelineScroll() {
+      requestAnimationFrame(function () {
+        requestAnimationFrame(scrollTopTimelineToFirstRow);
+      });
     }
 
     function renderTimeline(data) {
@@ -2317,6 +2444,7 @@
       }
 
       trendTimelineInstance.setWindow(data.trendOptions.start, data.trendOptions.end, { animation: false });
+      scheduleInitialTopTimelineScroll();
 
       attachTrendClickHandler(trendTimelineInstance);
       trendTimelineInstance.on("changed", scheduleTrendEndpointAnchoring);
@@ -2656,10 +2784,32 @@
       }, 2000);
     }
 
+    function removeInlineStyleProperties(element, propertyNames) {
+      for (let i = 0; i < propertyNames.length; i += 1) {
+        element.style.removeProperty(propertyNames[i]);
+      }
+      if (!element.getAttribute("style")) {
+        element.removeAttribute("style");
+      }
+    }
+
+    function clearExportLayoutStyles() {
+      removeInlineStyleProperties(el.timelineStage, [
+        "flex", "width", "max-width", "height", "min-height", "padding-bottom", "overflow"
+      ]);
+      removeInlineStyleProperties(el.timelineChartArea, ["flex", "width", "height"]);
+      removeInlineStyleProperties(el.timelineShell, ["flex", "width", "height"]);
+      removeInlineStyleProperties(el.paradigmShell, ["flex", "width", "height"]);
+      removeInlineStyleProperties(el.timelineTop, ["width"]);
+      removeInlineStyleProperties(el.timelineBottom, ["width"]);
+      removeInlineStyleProperties(el.exportLoadingOverlay, [
+        "position", "top", "left", "width", "height"
+      ]);
+    }
+
     async function exportTimelineAsJpeg() {
       const buttons = getExportButtons();
       const originalLabels = buttons.map(function (btn) { return btn.textContent; });
-      let exportState = null;
       let exportSucceeded = false;
       forEachButton(buttons, function (btn) {
         btn.disabled = true;
@@ -2696,24 +2846,6 @@
           timelineTop: exportTimelineWidth,
           timelineBottom: exportTimelineWidth
         };
-        const styledElements = [
-          el.timelineStage,
-          el.timelineChartArea,
-          el.timelineShell,
-          el.paradigmShell,
-          el.timelineTop,
-          el.timelineBottom,
-          el.exportLoadingOverlay
-        ];
-        exportState = {
-          inlineStyles: styledElements.map(function (element) {
-            return { element, style: element.getAttribute("style") };
-          }),
-          originalTimelineWidth,
-          trendWindow: trendTimelineInstance.getWindow(),
-          paradigmWindow: paradigmTimelineInstance.getWindow()
-        };
-
         el.exportLoadingOverlay.style.position = "fixed";
         el.exportLoadingOverlay.style.top = originalStageRect.top + "px";
         el.exportLoadingOverlay.style.left = originalStageRect.left + "px";
@@ -2726,13 +2858,15 @@
         const trendRangeCount = currentTrendItems.filter(function (item) {
           return item.type === "range";
         }).length;
-        const fullTrendHeight = Math.max(trendRangeCount * 28 + 80, 78);
+        const fullTrendHeight = Math.max(trendRangeCount * 52 + 80, 78);
         const paradigmRangeCount = currentParadigmItems.filter(function (item) {
           return item.type === "range";
         }).length;
-        const fullParadigmHeight = Math.max(paradigmRangeCount * 24 + 50, 76);
+        const fullParadigmHeight = Math.max(paradigmRangeCount * 52 + 50, 76);
         const fullChartHeight = fullTrendHeight + fullParadigmHeight;
         const titleHeight = Math.ceil(el.timelineTitle.getBoundingClientRect().height);
+
+        el.timelineLabelRail.style.setProperty("--paradigm-label-height", fullParadigmHeight + "px");
 
         el.timelineStage.style.flex = "0 0 auto";
         el.timelineStage.style.width = exportWidths.stage + "px";
@@ -2769,6 +2903,7 @@
         });
         paradigmTimelineInstance.setOptions({
           height: fullParadigmHeight + "px",
+          groupHeightMode: "fitItems",
           min: exportStart,
           max: exactExportEnd
         });
@@ -2833,16 +2968,18 @@
         console.error("Export failed:", error);
       } finally {
         try {
-          if (exportState) {
-            for (let i = 0; i < exportState.inlineStyles.length; i += 1) {
-              const entry = exportState.inlineStyles[i];
-              if (entry.style === null) {
-                entry.element.removeAttribute("style");
-              } else {
-                entry.element.setAttribute("style", entry.style);
-              }
-            }
+          clearExportLayoutStyles();
+          if (currentParadigmOptions) {
+            el.timelineLabelRail.style.setProperty(
+              "--paradigm-label-height",
+              currentParadigmOptions.height + "px"
+            );
+          }
+          isExportingImage = false;
+          el.timelineStage.classList.remove("is-exporting-image");
+          el.timelineStage.classList.remove("is-mobile-export");
 
+          if (trendTimelineInstance && paradigmTimelineInstance && currentTrendOptions && currentParadigmOptions) {
             const trendBounds = buildBounds(currentTrendOptions);
             const paradigmBounds = buildBounds(currentParadigmOptions);
             lastAppliedTopHeight = null;
@@ -2854,19 +2991,18 @@
             });
             paradigmTimelineInstance.setOptions({
               ...paradigmBounds,
-              height: (currentParadigmOptions.height || PARADIGM_ROW_HEIGHT) + "px"
+              height: (currentParadigmOptions.height || PARADIGM_ROW_HEIGHT) + "px",
+              groupHeightMode: "fixed"
             });
             trendTimelineInstance.redraw();
             paradigmTimelineInstance.redraw();
-            trendTimelineInstance.setWindow(exportState.trendWindow.start, exportState.trendWindow.end, { animation: false });
-            paradigmTimelineInstance.setWindow(exportState.paradigmWindow.start, exportState.paradigmWindow.end, { animation: false });
+            await nextAnimationFrame();
+            await nextAnimationFrame();
+            resetTimelineZoom(false);
             await nextAnimationFrame();
             anchorTrendEndpointYears();
           }
         } finally {
-          isExportingImage = false;
-          el.timelineStage.classList.remove("is-exporting-image");
-          el.timelineStage.classList.remove("is-mobile-export");
           el.exportLoadingOverlay.classList.add("hidden");
           el.timelineStage.removeAttribute("aria-busy");
         }
@@ -3003,11 +3139,11 @@
       }
     }
 
-    function resetTimelineZoom() {
+    function resetTimelineZoom(animate) {
       if (!trendTimelineInstance) {
         return;
       }
-      trendTimelineInstance.fit({ animation: true });
+      trendTimelineInstance.fit({ animation: animate !== false });
     }
 
     function updateFullscreenButtonState() {
