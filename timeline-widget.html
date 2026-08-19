@@ -506,11 +506,15 @@
     }
 
     .timeline-stage.is-exporting-image .timeline-label-rail {
-      font-size: 1.4rem;
+      flex: 0 0 72px;
+      width: 72px;
+      font-size: 2rem;
     }
 
     .timeline-stage.is-exporting-image .timeline-part-label.time {
-      font-size: 1rem;
+      font-size: 2rem;
+      flex-basis: 54px;
+      height: 54px;
     }
 
     .timeline-part-label {
@@ -614,7 +618,13 @@
     }
 
     .timeline-stage.is-exporting-image div.vis-time-axis.vis-foreground .vis-text {
-      font-size: 1.2rem;
+      font-size: 2rem;
+      padding-top: 9px;
+      padding-bottom: 9px;
+    }
+
+    .timeline-stage.is-exporting-image div.vis-time-axis.vis-foreground {
+      height: 52px !important;
     }
 
     .vis-panel.vis-top,
@@ -665,7 +675,7 @@
     }
 
     .timeline-stage.is-exporting-image .vis-item.paradigm-range {
-      font-size: 1.4rem;
+      font-size: 1.8rem;
       min-height: 48px;
     }
 
@@ -805,7 +815,11 @@
 
     .timeline-stage.is-exporting-image .trend-start-year,
     .timeline-stage.is-exporting-image .trend-end-year {
-      font-size: 1.4rem;
+      font-size: 1.8rem;
+    }
+
+    .timeline-stage.is-exporting-image .timeline-title {
+      font-size: 3rem;
     }
 
     .vis-item.trend-range.dot-left::before {
@@ -1418,7 +1432,7 @@
         <div class="timeline-label-rail" id="timelineLabelRail" aria-label="Timeline chart sections">
           <div class="timeline-part-label trends vertical"><span id="trendSectionLabel">Energy Sources</span></div>
           <div class="timeline-part-label time"><span>Time</span></div>
-          <div class="timeline-part-label paradigms vertical"><span>Paradigm shifts</span></div>
+          <div class="timeline-part-label paradigms vertical"><span>Social Paradigms</span></div>
         </div>
         <div class="timeline-chart-content">
           <div class="timeline-shell timeline-top-shell" id="timelineShell">
@@ -2250,7 +2264,6 @@
     function buildTopOptions(baseOptions, timeAxisStep) {
       const bounds = buildBounds(baseOptions);
       const heightPx = getAvailableTopTimelineHeight();
-      const isMobile = window.innerWidth <= 768;
       return {
         ...baseOptions,
         ...bounds,
@@ -2268,7 +2281,7 @@
         },
         timeAxis: {
           scale: "year",
-          step: isMobile ? 100 : (timeAxisStep || 50)
+          step: timeAxisStep || 25
         },
         groupHeightMode: "fixed",
         showCurrentTime: false,
@@ -2438,9 +2451,9 @@
       }
 
       try {
-        trendTimelineInstance = new vis.Timeline(el.timelineTop, trendItems, trendGroups, buildTopOptions(data.trendOptions, 50));
+        trendTimelineInstance = new vis.Timeline(el.timelineTop, trendItems, trendGroups, buildTopOptions(data.trendOptions, 25));
       } catch (error) {
-        trendTimelineInstance = new vis.Timeline(el.timelineTop, trendItems, trendGroups, buildTopOptions(data.trendOptions, 50));
+        trendTimelineInstance = new vis.Timeline(el.timelineTop, trendItems, trendGroups, buildTopOptions(data.trendOptions, 25));
       }
 
       trendTimelineInstance.setWindow(data.trendOptions.start, data.trendOptions.end, { animation: false });
@@ -2833,10 +2846,9 @@
           timelineTop: Math.ceil(el.timelineTop.getBoundingClientRect().width),
           timelineBottom: Math.ceil(el.timelineBottom.getBoundingClientRect().width)
         };
-        const originalTimelineWidth = originalWidths.stage;
         const isMobileExport = window.innerWidth <= 768;
-        const targetExportWidth = isMobileExport ? 1080 : originalTimelineWidth;
-        const exportRailWidth = isMobileExport ? 40 : Math.max(originalWidths.stage - originalWidths.timelineShell, 0);
+        const targetExportWidth = 1920;
+        const exportRailWidth = 72;
         const exportTimelineWidth = targetExportWidth - exportRailWidth;
         const exportWidths = {
           stage: targetExportWidth,
