@@ -679,6 +679,7 @@
     .timeline-stage.is-exporting-image .vis-item.paradigm-range {
       font-size: 1.8rem;
       min-height: 48px;
+      overflow: visible !important;
       background-image: none !important;
       background-color: var(--paradigm-fill) !important;
       box-shadow:
@@ -2770,6 +2771,53 @@
         "#timelineStage *::before, #timelineStage *::after { background-image: none !important; }"
       ].join("\n");
       clonedDocument.head.appendChild(exportSafetyStyle);
+
+      const clonedTimeline = clonedDocument.getElementById("timelineBottom");
+      if (!clonedTimeline) {
+        return;
+      }
+
+      const itemPanel = clonedTimeline.querySelector(".vis-panel.vis-center") || clonedTimeline;
+      const panelBounds = itemPanel.getBoundingClientRect();
+      const paradigmRanges = clonedTimeline.querySelectorAll(".vis-item.paradigm-range");
+      for (let i = 0; i < paradigmRanges.length; i += 1) {
+        const range = paradigmRanges[i];
+        const content = range.querySelector(".vis-item-content");
+        if (!content) {
+          continue;
+        }
+
+        // vis-timeline wraps range content in an overflow:hidden element. That
+        // can hide a label even while its range remains visible in the export.
+        // Move only the cloned label onto the range and keep it inside the chart.
+        range.appendChild(content);
+        content.style.setProperty("position", "absolute", "important");
+        content.style.setProperty("display", "flex", "important");
+        content.style.setProperty("align-items", "center", "important");
+        content.style.setProperty("top", "0", "important");
+        content.style.setProperty("left", "0", "important");
+        content.style.setProperty("width", "max-content", "important");
+        content.style.setProperty("min-width", "0", "important");
+        content.style.setProperty("max-width", "none", "important");
+        content.style.setProperty("min-height", "48px", "important");
+        content.style.setProperty("white-space", "nowrap", "important");
+        content.style.setProperty("transform", "none", "important");
+        content.style.setProperty("z-index", "2", "important");
+
+        const rangeBounds = range.getBoundingClientRect();
+        const contentBounds = content.getBoundingClientRect();
+        const horizontalPadding = 10;
+        const panelLeft = panelBounds.left + horizontalPadding;
+        const panelRight = panelBounds.right - horizontalPadding;
+        let labelLeft = Math.max(rangeBounds.left, panelLeft);
+        if (labelLeft + contentBounds.width > panelRight) {
+          labelLeft = Math.max(panelLeft, panelRight - contentBounds.width);
+        }
+
+        const labelTop = Math.max(0, panelBounds.top - rangeBounds.top);
+        content.style.setProperty("left", (labelLeft - rangeBounds.left) + "px", "important");
+        content.style.setProperty("top", labelTop + "px", "important");
+      }
     }
 
     async function exportTimelineAsJpeg() {
