@@ -26,8 +26,11 @@
       --axis-border: #0a4f55;
       --paradigm-fill: rgba(176, 122, 48, 0.12);
       --paradigm-border: rgba(148, 98, 32, 0.42);
+      --paradigm-export-fill: #f1e9dc;
+      --paradigm-export-border: #cfb99a;
       --paradigm-accent: #a67c2e;
       --paradigm-ink: #5c3f12;
+      --paradigm-timeline-height: 200px;
       --shadow-sm: 0 1px 2px rgba(26, 35, 50, 0.05);
       --shadow-md: 0 8px 28px rgba(26, 35, 50, 0.08);
       --header-h: auto;
@@ -575,8 +578,11 @@
 
     .timeline-bottom-shell {
       flex: 0 0 200px;
+      flex: 0 0 var(--paradigm-timeline-height);
       height: 200px;
+      height: var(--paradigm-timeline-height);
       min-height: 200px;
+      min-height: var(--paradigm-timeline-height);
       background:
         linear-gradient(180deg, rgba(166, 124, 46, 0.06), transparent 48px),
         var(--bg-elevated);
@@ -668,23 +674,40 @@
       letter-spacing: 0.01em;
       line-height: 1.3;
       min-height: 24px;
+      overflow: visible !important;
       box-shadow: inset 0 0 0 1px rgba(255, 252, 247, 0.4);
       cursor: pointer;
     }
 
     .vis-item.paradigm-range .vis-item-content {
+      position: absolute !important;
+      top: 0;
+      left: 0;
+      display: flex;
+      align-items: center;
+      width: max-content;
+      min-width: 0;
+      max-width: none;
+      min-height: 24px;
       padding: 5px 10px;
+      white-space: nowrap;
+      overflow: visible;
+      transform: translate(
+        var(--paradigm-title-left, 0px),
+        var(--paradigm-title-top, 0px)
+      ) !important;
+      z-index: 2;
     }
 
     .timeline-stage.is-exporting-image .vis-item.paradigm-range {
       font-size: 1.8rem;
       min-height: 48px;
       overflow: visible !important;
-      background-image: none !important;
-      background-color: var(--paradigm-fill) !important;
-      box-shadow:
-        inset 0 24px 24px -24px rgba(255, 252, 247, 0.65),
-        inset 0 0 0 1px rgba(255, 252, 247, 0.4);
+      background: var(--paradigm-export-fill) !important;
+      border: 1px solid var(--paradigm-export-border);
+      border-left: 4px solid var(--paradigm-accent);
+      border-radius: 4px;
+      box-shadow: none;
     }
 
     .timeline-stage.is-exporting-image .vis-item.paradigm-range .vis-item-content {
@@ -694,7 +717,22 @@
       width: 100%;
       min-height: 48px;
       padding: 6px 10px;
+      background-color: transparent !important;
       transform: none !important;
+    }
+
+    .timeline-stage.is-exporting-image .vis-item.paradigm-range .vis-item-overflow {
+      background-color: transparent !important;
+    }
+
+    .timeline-stage.is-exporting-image .timeline-bottom-shell,
+    .timeline-stage.is-exporting-image #timelineBottom,
+    .timeline-stage.is-exporting-image #timelineBottom .vis-timeline,
+    .timeline-stage.is-exporting-image #timelineBottom .vis-panel,
+    .timeline-stage.is-exporting-image #timelineBottom .vis-content,
+    .timeline-stage.is-exporting-image #timelineBottom .vis-itemset,
+    .timeline-stage.is-exporting-image #timelineBottom .vis-group {
+      background-color: var(--bg-elevated) !important;
     }
 
     .vis-item.trend-range.trend-color-0 {
@@ -799,9 +837,15 @@
     }
 
     .trend-title-text {
-      position: relative;
+      position: absolute;
       top: -2px;
+      left: 6px;
       white-space: nowrap;
+      transform: translate(
+        var(--trend-title-left, 0px),
+        var(--trend-title-top, 0px)
+      );
+      z-index: 2;
     }
 
     .timeline-stage.is-exporting-image .trend-title-text {
@@ -810,6 +854,7 @@
       bottom: calc(100% - var(--trend-line-center-y) + 6px);
       left: 20px;
       line-height: 1.1;
+      transform: none;
     }
 
     .trend-start-year,
@@ -851,6 +896,7 @@
     }
 
     .timeline-stage.is-exporting-image .timeline-bottom-shell {
+      min-height: 0;
       background-image: none !important;
       background-color: var(--bg-elevated);
       box-shadow: inset 0 48px 48px -48px rgba(166, 124, 46, 0.06);
@@ -1519,7 +1565,7 @@
     const DEFAULT_GROUP_ID = "default";
     const PARADIGM_GROUP_ID = "paradigms";
     const TREND_ROW_HEIGHT = 40;
-    const PARADIGM_TIMELINE_HEIGHT = 300;
+    const PARADIGM_TIMELINE_HEIGHT = 200;
     const EVENT_TITLE_MAX = 10;
     const TIMELINE_REQUIRED_HEADERS = ["Title", "Start", "End", "Increment"];
     const DATA_REQUIRED_HEADERS = ["Start Yr", "Event", "Paradigm"];
@@ -1536,6 +1582,7 @@
     let currentParadigmOptions = null;
     let pendingInitialWindow = null;
     let isExportingImage = false;
+    let activeExportWindow = null;
 
     const el = {
       widgetRoot: document.getElementById("widgetRoot"),
@@ -2044,6 +2091,7 @@
           startIsBce: startInfo.isBce,
           endIsBce: endInfo.isBce,
           titleText: paradigm.title,
+          displayText: paradigm.title + " (" + startInfo.raw + "-" + endInfo.raw + ")",
           content: escapeHtml(paradigm.title) + " (" + escapeHtml(startInfo.raw) + "-" + escapeHtml(endInfo.raw) + ")"
         });
       });
@@ -2195,6 +2243,20 @@
       return wrapper;
     }
 
+    function buildParadigmItemTemplate(item) {
+      if (!item || item.type !== "range") {
+        return item ? (item.content || item.title || "") : "";
+      }
+
+      const wrapper = document.createElement("span");
+      wrapper.className = "paradigm-title-text";
+      wrapper.textContent = item.displayText || item.titleText || item.content || "";
+      wrapper.dataset.exportItemId = String(item.id || "");
+      wrapper.dataset.exportStartMs = String(new Date(item.start).getTime());
+      wrapper.dataset.exportEndMs = String(new Date(item.end).getTime());
+      return wrapper;
+    }
+
     function buildTopOptions(baseOptions, timeAxisStep) {
       const bounds = buildBounds(baseOptions);
       const heightPx = getAvailableTopTimelineHeight();
@@ -2245,6 +2307,7 @@
           axis: 0
         },
         showCurrentTime: false,
+        template: buildParadigmItemTemplate,
         // timeAxis: {
         //   scale: "year",
         //   step: 1
@@ -2320,8 +2383,28 @@
       const ranges = el.timelineTop.querySelectorAll(".vis-item.trend-range");
       for (let i = 0; i < ranges.length; i += 1) {
         const range = ranges[i];
-        const startYear = range.querySelector(".trend-start-year");
-        const endYear = range.querySelector(".trend-end-year");
+        const startYears = Array.from(range.querySelectorAll(".trend-start-year"));
+        const endYears = Array.from(range.querySelectorAll(".trend-end-year"));
+        const startYear = startYears.find(function (node) {
+          return node.parentElement === range;
+        }) || startYears[0];
+        const endYear = endYears.find(function (node) {
+          return node.parentElement === range;
+        }) || endYears[0];
+
+        // A vis-timeline redraw may render a new template after an endpoint was
+        // moved onto the range. Keep exactly one node so a year is never painted
+        // twice for the same energy source/use.
+        for (let nodeIndex = 0; nodeIndex < startYears.length; nodeIndex += 1) {
+          if (startYears[nodeIndex] !== startYear) {
+            startYears[nodeIndex].remove();
+          }
+        }
+        for (let nodeIndex = 0; nodeIndex < endYears.length; nodeIndex += 1) {
+          if (endYears[nodeIndex] !== endYear) {
+            endYears[nodeIndex].remove();
+          }
+        }
 
         // vis-timeline nests item content in a shrink-to-fit wrapper. Moving the
         // endpoint labels to the range itself makes 100% mean the full arrow length.
@@ -2334,8 +2417,132 @@
       }
     }
 
+    function unwrapDefaultTimelineRangeContent() {
+      const rangeCollections = [
+        [el.timelineTop, ".vis-item.trend-range"],
+        [el.timelineBottom, ".vis-item.paradigm-range"]
+      ];
+
+      for (let collectionIndex = 0; collectionIndex < rangeCollections.length; collectionIndex += 1) {
+        const root = rangeCollections[collectionIndex][0];
+        const selector = rangeCollections[collectionIndex][1];
+        const ranges = root.querySelectorAll(selector);
+
+        for (let rangeIndex = 0; rangeIndex < ranges.length; rangeIndex += 1) {
+          const range = ranges[rangeIndex];
+          const content = range.querySelector(".vis-item-content");
+
+          // vis-timeline puts range labels inside an overflow:hidden helper.
+          // Keeping the content directly on the range lets short ranges display
+          // their complete labels while preserving the range as the click target.
+          if (content && content.parentElement !== range) {
+            range.appendChild(content);
+          }
+        }
+      }
+    }
+
+    function positionDefaultTimelineRangeTitles() {
+      unwrapDefaultTimelineRangeContent();
+
+      const trendPanel = el.timelineTop.querySelector(".vis-panel.vis-center");
+      const trendRanges = el.timelineTop.querySelectorAll(".vis-item.trend-range");
+      if (trendPanel) {
+        const panelBounds = trendPanel.getBoundingClientRect();
+        const panelLeft = panelBounds.left + 8;
+        const panelRight = panelBounds.right - 8;
+        const panelTop = panelBounds.top + 2;
+        const panelBottom = panelBounds.bottom - 2;
+
+        for (let i = 0; i < trendRanges.length; i += 1) {
+          const range = trendRanges[i];
+          const title = range.querySelector(".trend-title-text");
+          if (!title) {
+            continue;
+          }
+
+          title.style.removeProperty("--trend-title-left");
+          title.style.removeProperty("--trend-title-top");
+          const rangeBounds = range.getBoundingClientRect();
+          const titleBounds = title.getBoundingClientRect();
+          let targetLeft = Math.max(titleBounds.left, panelLeft);
+          if (targetLeft + titleBounds.width > panelRight) {
+            targetLeft = Math.max(panelLeft, panelRight - titleBounds.width);
+          }
+          let targetTop = titleBounds.top;
+          if (rangeBounds.bottom > panelTop && rangeBounds.top < panelBottom) {
+            targetTop = Math.max(titleBounds.top, panelTop);
+            if (targetTop + titleBounds.height > panelBottom) {
+              targetTop = Math.max(panelTop, panelBottom - titleBounds.height);
+            }
+          }
+
+          // Translate from the title's actual rendered location instead of from
+          // the range start. Long-running ranges can begin thousands of years
+          // outside the current window, so their range-relative coordinates are
+          // not a reliable on-screen anchor.
+          title.style.setProperty("--trend-title-left", (targetLeft - titleBounds.left) + "px");
+          title.style.setProperty("--trend-title-top", (targetTop - titleBounds.top) + "px");
+        }
+      }
+
+      const paradigmPanel = el.timelineBottom.querySelector(".vis-panel.vis-center");
+      const paradigmRanges = el.timelineBottom.querySelectorAll(".vis-item.paradigm-range");
+      if (paradigmPanel) {
+        const panelBounds = paradigmPanel.getBoundingClientRect();
+        const panelLeft = panelBounds.left + 8;
+        const panelRight = panelBounds.right - 8;
+        const panelTop = panelBounds.top + 2;
+        const panelBottom = panelBounds.bottom - 2;
+
+        for (let i = 0; i < paradigmRanges.length; i += 1) {
+          const range = paradigmRanges[i];
+          const content = range.querySelector(".vis-item-content");
+          if (!content) {
+            continue;
+          }
+
+          content.style.removeProperty("--paradigm-title-left");
+          content.style.removeProperty("--paradigm-title-top");
+          const rangeBounds = range.getBoundingClientRect();
+          const contentBounds = content.getBoundingClientRect();
+          let targetLeft = Math.max(contentBounds.left, panelLeft);
+          if (targetLeft + contentBounds.width > panelRight) {
+            targetLeft = Math.max(panelLeft, panelRight - contentBounds.width);
+          }
+          let targetTop = contentBounds.top;
+          if (rangeBounds.bottom > panelTop && rangeBounds.top < panelBottom) {
+            targetTop = Math.max(contentBounds.top, panelTop);
+            if (targetTop + contentBounds.height > panelBottom) {
+              targetTop = Math.max(panelTop, panelBottom - contentBounds.height);
+            }
+          }
+
+          content.style.setProperty("--paradigm-title-left", (targetLeft - contentBounds.left) + "px");
+          content.style.setProperty("--paradigm-title-top", (targetTop - contentBounds.top) + "px");
+        }
+      }
+    }
+
+    let defaultRangeLabelLayoutFrame = null;
+
+    function scheduleDefaultTimelineRangeTitleLayout() {
+      if (defaultRangeLabelLayoutFrame !== null) {
+        cancelAnimationFrame(defaultRangeLabelLayoutFrame);
+      }
+      defaultRangeLabelLayoutFrame = requestAnimationFrame(function () {
+        defaultRangeLabelLayoutFrame = null;
+        if (!isExportingImage) {
+          positionDefaultTimelineRangeTitles();
+        }
+      });
+    }
+
     function scheduleTrendEndpointAnchoring() {
-      requestAnimationFrame(anchorTrendEndpointYears);
+      requestAnimationFrame(function () {
+        anchorTrendEndpointYears();
+        scheduleDefaultTimelineRangeTitleLayout();
+      });
     }
 
     function scrollTopTimelineToFirstRow() {
@@ -2371,7 +2578,10 @@
       lastAppliedTopHeight = null;
       el.timelineTitle.textContent = data.title;
       el.trendSectionLabel.textContent = TIMELINE_CONFIGS[activeTabKey].label;
-      el.timelineLabelRail.style.setProperty("--paradigm-label-height", data.paradigmOptions.height + "px");
+      el.timelineLabelRail.style.setProperty(
+        "--paradigm-label-height",
+        data.paradigmOptions.height + "px"
+      );
 
       const trendItems = new vis.DataSet(data.trendItems);
       const trendGroups = new vis.DataSet(data.trendGroups);
@@ -2411,10 +2621,14 @@
 
       syncTimelineWindowsBidirectional(trendTimelineInstance, paradigmTimelineInstance);
 
+      paradigmTimelineInstance.on("changed", scheduleDefaultTimelineRangeTitleLayout);
+      paradigmTimelineInstance.on("rangechanged", scheduleDefaultTimelineRangeTitleLayout);
+
       attachParadigmClickHandler(paradigmTimelineInstance);
 
       // Keep the initial viewport aligned after creation.
       paradigmTimelineInstance.setWindow(data.trendOptions.start, data.trendOptions.end, { animation: false });
+      scheduleDefaultTimelineRangeTitleLayout();
     }
 
     function formatDate(date) {
@@ -2772,6 +2986,29 @@
       ].join("\n");
       clonedDocument.head.appendChild(exportSafetyStyle);
 
+      const clonedTrendTimeline = clonedDocument.getElementById("timelineTop");
+      if (clonedTrendTimeline) {
+        const trendRanges = clonedTrendTimeline.querySelectorAll(".vis-item.trend-range");
+        for (let i = 0; i < trendRanges.length; i += 1) {
+          const range = trendRanges[i];
+          const exportLine = range.querySelector(".trend-export-line");
+          if (!exportLine) {
+            continue;
+          }
+
+          // The export line starts inside the label template. Once vis-timeline
+          // reparents that content, width:100% may resolve against the item set
+          // instead of the dated range. Anchor it directly to the native range
+          // and stretch between that range's own left and right edges.
+          range.appendChild(exportLine);
+          exportLine.style.setProperty("position", "absolute", "important");
+          exportLine.style.setProperty("left", "0", "important");
+          exportLine.style.setProperty("right", "0", "important");
+          exportLine.style.setProperty("width", "auto", "important");
+          exportLine.style.setProperty("transform", "none", "important");
+        }
+      }
+
       const clonedTimeline = clonedDocument.getElementById("timelineBottom");
       if (!clonedTimeline) {
         return;
@@ -2779,18 +3016,46 @@
 
       const itemPanel = clonedTimeline.querySelector(".vis-panel.vis-center") || clonedTimeline;
       const panelBounds = itemPanel.getBoundingClientRect();
-      const paradigmRanges = clonedTimeline.querySelectorAll(".vis-item.paradigm-range");
-      for (let i = 0; i < paradigmRanges.length; i += 1) {
-        const range = paradigmRanges[i];
-        const content = range.querySelector(".vis-item-content");
-        if (!content) {
+      const exportWindowStartMs = new Date(
+        activeExportWindow ? activeExportWindow.start : currentParadigmOptions.start
+      ).getTime();
+      const exportWindowEndMs = new Date(
+        activeExportWindow ? activeExportWindow.end : currentParadigmOptions.end
+      ).getTime();
+      const exportWindowSpanMs = Math.max(exportWindowEndMs - exportWindowStartMs, 1);
+      const paradigmRangeCandidates = Array.from(clonedTimeline.querySelectorAll(".vis-item.paradigm-range"));
+      const paradigmRanges = [];
+      const seenParadigmItemIds = new Set();
+      for (let candidateIndex = 0; candidateIndex < paradigmRangeCandidates.length; candidateIndex += 1) {
+        const candidate = paradigmRangeCandidates[candidateIndex];
+        const identityNode = candidate.querySelector(".paradigm-title-text[data-export-item-id]");
+        const itemId = identityNode ? identityNode.dataset.exportItemId : "";
+        if (itemId && seenParadigmItemIds.has(itemId)) {
+          candidate.remove();
           continue;
         }
+        if (itemId) {
+          seenParadigmItemIds.add(itemId);
+        }
+        paradigmRanges.push(candidate);
+      }
 
-        // vis-timeline wraps range content in an overflow:hidden element. That
-        // can hide a label even while its range remains visible in the export.
-        // Move only the cloned label onto the range and keep it inside the chart.
-        range.appendChild(content);
+      for (let i = 0; i < paradigmRanges.length; i += 1) {
+        const range = paradigmRanges[i];
+        const sourceTitle = range.querySelector(".paradigm-title-text");
+        if (!sourceTitle) {
+          continue;
+        }
+        const itemStartMs = Number(sourceTitle.dataset.exportStartMs);
+        const itemEndMs = Number(sourceTitle.dataset.exportEndMs);
+
+        // Do not reuse vis-timeline's cloned content node. Its computed paint
+        // layers can survive DOM cleanup and appear as a translucent rectangle.
+        // A fresh text-only label leaves the native outer range as the sole box.
+        const content = clonedDocument.createElement("span");
+        content.className = "paradigm-export-label";
+        content.textContent = sourceTitle.textContent;
+        range.replaceChildren(content);
         content.style.setProperty("position", "absolute", "important");
         content.style.setProperty("display", "flex", "important");
         content.style.setProperty("align-items", "center", "important");
@@ -2800,11 +3065,48 @@
         content.style.setProperty("min-width", "0", "important");
         content.style.setProperty("max-width", "none", "important");
         content.style.setProperty("min-height", "48px", "important");
+        content.style.setProperty("padding", "6px 10px", "important");
         content.style.setProperty("white-space", "nowrap", "important");
+        content.style.setProperty("background", "transparent", "important");
+        content.style.setProperty("border", "0", "important");
+        content.style.setProperty("box-shadow", "none", "important");
         content.style.setProperty("transform", "none", "important");
         content.style.setProperty("z-index", "2", "important");
 
-        const rangeBounds = range.getBoundingClientRect();
+        let rangeBounds = range.getBoundingClientRect();
+        const cloneView = clonedDocument.defaultView;
+        const computedRangeStyle = cloneView ? cloneView.getComputedStyle(range) : range.style;
+        const currentLeft = parseFloat(computedRangeStyle.left) || 0;
+
+        if (Number.isFinite(itemStartMs) && Number.isFinite(itemEndMs) && itemEndMs >= exportWindowStartMs) {
+          // Recompute the cloned native range from its real dates. This handles
+          // ranges such as Extractivism, whose start is before the export window
+          // and whose end sits exactly on the right boundary.
+          const visibleStartMs = Math.max(itemStartMs, exportWindowStartMs);
+          const visibleEndMs = Math.min(Math.max(itemEndMs, visibleStartMs), exportWindowEndMs);
+          const innerPanelLeft = panelBounds.left + 1;
+          const innerPanelRight = panelBounds.right - 1;
+          const innerPanelWidth = Math.max(innerPanelRight - innerPanelLeft, 1);
+          let desiredLeft = innerPanelLeft + ((visibleStartMs - exportWindowStartMs) / exportWindowSpanMs) * innerPanelWidth;
+          const desiredRight = innerPanelLeft + ((visibleEndMs - exportWindowStartMs) / exportWindowSpanMs) * innerPanelWidth;
+          const desiredWidth = Math.max(desiredRight - desiredLeft, 4);
+          desiredLeft = Math.min(desiredLeft, innerPanelRight - desiredWidth);
+
+          range.style.setProperty("left", (currentLeft + desiredLeft - rangeBounds.left) + "px", "important");
+          range.style.setProperty("width", desiredWidth + "px", "important");
+          rangeBounds = range.getBoundingClientRect();
+        } else {
+          const clippedLeft = Math.max(panelBounds.left + 1 - rangeBounds.left, 0);
+          const clippedRight = Math.max(rangeBounds.right - (panelBounds.right - 1), 0);
+          if (clippedLeft > 0 || clippedRight > 0) {
+            // Fallback for older items without export metadata.
+            const visibleWidth = Math.max(rangeBounds.width - clippedLeft - clippedRight, 1);
+            range.style.setProperty("left", (currentLeft + clippedLeft) + "px", "important");
+            range.style.setProperty("width", visibleWidth + "px", "important");
+            rangeBounds = range.getBoundingClientRect();
+          }
+        }
+
         const contentBounds = content.getBoundingClientRect();
         const horizontalPadding = 10;
         const panelLeft = panelBounds.left + horizontalPadding;
@@ -2901,10 +3203,9 @@
 
         const exportStart = new Date(currentParadigmOptions.start);
         const exactExportEnd = new Date(currentParadigmOptions.end);
-        const exportSpan = Math.max(exactExportEnd.getTime() - exportStart.getTime(), 1);
-        const rightPaddingPixels = 24;
-        const rightPaddingRatio = rightPaddingPixels / Math.max(exportWidths.timelineTop - rightPaddingPixels, 1);
-        const exportEnd = new Date(exactExportEnd.getTime() + exportSpan * rightPaddingRatio);
+        const exportEnd = new Date(exactExportEnd);
+        exportEnd.setFullYear(exportEnd.getFullYear() + 10);
+        activeExportWindow = { start: exportStart, end: exportEnd };
 
         trendTimelineInstance.setOptions({
           height: fullTrendHeight + "px",
@@ -2918,7 +3219,7 @@
           verticalScroll: false,
           groupHeightMode: "fitItems",
           min: exportStart,
-          max: exactExportEnd
+          max: exportEnd
         });
 
         // Height changes can make vis-timeline recalculate its root width.
@@ -2933,7 +3234,7 @@
         trendTimelineInstance.redraw();
         paradigmTimelineInstance.redraw();
         trendTimelineInstance.setWindow(exportStart, exportEnd, { animation: false });
-        paradigmTimelineInstance.setWindow(exportStart, exactExportEnd, { animation: false });
+        paradigmTimelineInstance.setWindow(exportStart, exportEnd, { animation: false });
 
         await nextAnimationFrame();
         await nextAnimationFrame();
@@ -2990,6 +3291,7 @@
             );
           }
           isExportingImage = false;
+          activeExportWindow = null;
           el.timelineStage.classList.remove("is-exporting-image");
           el.timelineStage.classList.remove("is-mobile-export");
 
@@ -3318,6 +3620,7 @@
           trendTimelineInstance.redraw();
           paradigmTimelineInstance.redraw();
         }
+        scheduleDefaultTimelineRangeTitleLayout();
       });
     }
 
