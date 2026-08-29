@@ -574,7 +574,9 @@
     }
 
     .timeline-bottom-shell {
-      flex: 0 0 auto;
+      flex: 0 0 200px;
+      height: 200px;
+      min-height: 200px;
       background:
         linear-gradient(180deg, rgba(166, 124, 46, 0.06), transparent 48px),
         var(--bg-elevated);
@@ -677,6 +679,11 @@
     .timeline-stage.is-exporting-image .vis-item.paradigm-range {
       font-size: 1.8rem;
       min-height: 48px;
+      background-image: none !important;
+      background-color: var(--paradigm-fill) !important;
+      box-shadow:
+        inset 0 24px 24px -24px rgba(255, 252, 247, 0.65),
+        inset 0 0 0 1px rgba(255, 252, 247, 0.4);
     }
 
     .timeline-stage.is-exporting-image .vis-item.paradigm-range .vis-item-content {
@@ -747,7 +754,23 @@
 
     .timeline-stage.is-exporting-image .vis-item.trend-range {
       --trend-line-center-y: 36px;
+      background-image: none !important;
       min-height: 48px !important;
+    }
+
+    .trend-export-line {
+      display: none;
+    }
+
+    .timeline-stage.is-exporting-image .trend-export-line {
+      display: block;
+      position: absolute;
+      top: calc(var(--trend-line-center-y) - 1.25px);
+      left: 0;
+      width: 100%;
+      height: 2.5px;
+      background-color: var(--trend-line);
+      pointer-events: none;
     }
 
     .vis-item.trend-range .vis-item-content {
@@ -820,6 +843,16 @@
 
     .timeline-stage.is-exporting-image .timeline-title {
       font-size: 3rem;
+    }
+
+    .timeline-stage.is-exporting-image .vis-shadow {
+      display: none !important;
+    }
+
+    .timeline-stage.is-exporting-image .timeline-bottom-shell {
+      background-image: none !important;
+      background-color: var(--bg-elevated);
+      box-shadow: inset 0 48px 48px -48px rgba(166, 124, 46, 0.06);
     }
 
     .vis-item.trend-range.dot-left::before {
@@ -1456,7 +1489,7 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.5.3/papaparse.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <script src="https://unpkg.com/vis-timeline/standalone/umd/vis-timeline-graph2d.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script>
@@ -1464,66 +1497,31 @@
     const TIMELINE_CONFIGS = {
       "energy-sources": {
         label: "Energy Sources",
-        publishedBase: "https://docs.google.com/spreadsheets/d/1wIpTU8C0JHfh_o2dLKWErrjGlq-fRChb7G866rqJgP8/export",
-        sheetGids: { timeline: "645387254", master: "825820318" },
-        trendType: "energy source",
-        trendColumn: "Energy Source"
+        workbookUrl: "https://docs.google.com/spreadsheets/d/1FzvsnTiFBMbd4qTl413WTfStqPECJiQYJ9GOkpUM7s0/export?format=xlsx"
       },
       "energy-uses": {
         label: "Energy Uses",
-        publishedBase: "https://docs.google.com/spreadsheets/d/1MwxywZTEw5EsqYRxYXzkEjCfPetmgU2TKBkVe5ZFJUo/export",
-        sheetGids: { timeline: "645387254", master: "127778185" },
-        trendType: "energy use",
-        trendColumn: "Energy Use"
+        workbookUrl: "https://docs.google.com/spreadsheets/d/1ctHZncWlVKlUTrEnv-Px6aP29P1eYUW9OgExkB9V0OY/export?format=xlsx"
       },
       "energy-transformations": {
         label: "Energy Transformations",
-        publishedBase: "",
-        sheetGids: { timeline: "", master: "" },
-        trendType: "",
-        trendColumn: ""
+        workbookUrl: ""
       }
     };
 
     const ACTIVE_TAB_KEY = "energy-sources";
 
-    // Keep empty when using published CSV URLs directly.
+    // Keep empty when fetching the public XLSX export directly.
     const CORS_PROXY = "";
-     const SHEET_NAMES = {
-       timeline: "Timeline",
-       master: "Master"
-     };
+    const TIMELINE_SHEET_NAME = "TIMELINE";
 
     const DEFAULT_GROUP_ID = "default";
     const PARADIGM_GROUP_ID = "paradigms";
     const TREND_ROW_HEIGHT = 40;
-    const PARADIGM_ROW_HEIGHT = 30;
+    const PARADIGM_TIMELINE_HEIGHT = 300;
     const EVENT_TITLE_MAX = 10;
-    const TIMELINE_REQUIRED_HEADERS = [
-      "Type",
-      "RowId",
-      "Title",
-      "Start Year",
-      "Start Month",
-      "Start Day",
-      "End Year",
-      "End Month",
-      "End Day"
-    ];
-
-    function getMasterRequiredHeaders(config) {
-      return [
-        "Start Yr",
-        "Start Mo",
-        "Start Day",
-        "End Yr",
-        "End Mo",
-        "End Day",
-        config.trendColumn,
-        "Paradigm",
-        "Event"
-      ];
-    }
+    const TIMELINE_REQUIRED_HEADERS = ["Title", "Start", "End", "Increment"];
+    const DATA_REQUIRED_HEADERS = ["Start Yr", "Event", "Paradigm"];
 
     let trendTimelineInstance = null;
     let paradigmTimelineInstance = null;
@@ -1611,18 +1609,6 @@
       el.timelineChartArea.classList.add("hidden");
     }
 
-    function csvUrl(sheetName, config) {
-      const gid = config.sheetGids[sheetName === SHEET_NAMES.timeline ? "timeline" : "master"];
-
-      if (!gid) {
-        throw new Error("Missing gid for sheet: " + sheetName);
-      }
-
-      const separator = config.publishedBase.includes("?") ? "&" : "?";
-      // return config.publishedBase + separator + "single=true&gid=" + encodeURIComponent(gid) + "&output=csv";
-      return config.publishedBase + separator + "gid=" + encodeURIComponent(gid) + "&format=csv";
-    }
-
     function buildRequestUrl(rawUrl) {
       if (!CORS_PROXY) {
         return rawUrl;
@@ -1632,179 +1618,224 @@
       return proxyBase + "/?url=" + encodeURIComponent(rawUrl);
     }
 
-    function parseCsvText(csvText, sheetName, sheetKind, config) {
-       return new Promise((resolve, reject) => {
-         Papa.parse(csvText, {
-           header: true,
-           skipEmptyLines: true,
-           worker: true,
-           complete: (result) => {
-             if (result.errors && result.errors.length > 0) {
-               reject(new Error("CSV parse error in sheet \"" + sheetName + "\": " + result.errors[0].message));
-               return;
-             }
-
-            try {
-              assertRequiredHeaders(sheetName, sheetKind, result.meta && result.meta.fields ? result.meta.fields : [], config);
-            } catch (validationError) {
-              reject(validationError);
-              return;
-            }
-
-             resolve(result.data || []);
-           },
-           error: (err) => reject(new Error("CSV parse failed in sheet \"" + sheetName + "\": " + err.message))
-         });
-       });
-     }
-
-    function assertRequiredHeaders(sheetName, sheetKind, fields, config) {
-      const expected = sheetKind === "timeline"
-        ? TIMELINE_REQUIRED_HEADERS
-        : getMasterRequiredHeaders(config);
-      const available = new Set((fields || []).map((name) => String(name == null ? "" : name).trim()));
-      const missing = expected.filter((header) => !available.has(header));
-
-      if (missing.length > 0) {
-        throw new Error(
-          "Sheet \"" + sheetName + "\" does not match expected " + sheetKind +
-          " schema. Missing columns: " + missing.join(", ") +
-          ". Check the sheet name and header row."
-        );
-      }
-    }
-
-    async function fetchSheetRows(sheetName, sheetKind, config) {
-      const targetUrl = csvUrl(sheetName, config);
-      const requestUrl = buildRequestUrl(targetUrl);
+    async function fetchWorkbook(config) {
+      const requestUrl = buildRequestUrl(config.workbookUrl);
       let response;
 
       try {
         response = await fetch(requestUrl, { cache: "no-store" });
       } catch (error) {
         throw new Error(
-          "Network/CORS error for sheet \"" + sheetName + "\". " +
+          "Network/CORS error while downloading the Google Sheets workbook. " +
           "If testing locally, run with http(s) and set CORS_PROXY."
         );
       }
 
       if (!response.ok) {
-        throw new Error("Failed to fetch sheet \"" + sheetName + "\" (" + response.status + ")");
+        throw new Error("Failed to fetch the Google Sheets workbook (" + response.status + ")");
       }
 
-      const csvText = await response.text();
-      return parseCsvText(csvText, sheetName, sheetKind, config);
+      const bytes = await response.arrayBuffer();
+      const signature = new Uint8Array(bytes, 0, Math.min(bytes.byteLength, 2));
+      if (signature.length < 2 || signature[0] !== 0x50 || signature[1] !== 0x4b) {
+        throw new Error("The Google Sheets export did not return a valid XLSX workbook.");
+      }
+
+      if (typeof XLSX === "undefined" || typeof XLSX.read !== "function") {
+        throw new Error("SheetJS failed to load.");
+      }
+
+      try {
+        return XLSX.read(new Uint8Array(bytes), {
+          type: "array",
+          dense: true,
+          cellFormula: false,
+          cellHTML: false,
+          cellStyles: false
+        });
+      } catch (error) {
+        throw new Error("Unable to parse the XLSX workbook: " + (error.message || error));
+      }
     }
 
-    function toInt(value) {
-      const normalized = String(value == null ? "" : value).trim();
-      if (normalized === "") {
+    function toInteger(value) {
+      if (value == null || String(value).trim() === "") {
         return null;
       }
-      const timeline = parseInt(normalized, 10);
-      return Number.isFinite(timeline) ? timeline : null;
+      const parsed = Number(value);
+      return Number.isFinite(parsed) && Number.isInteger(parsed) ? parsed : null;
     }
 
-    function parseStartDate(row) {
-      const rawYear = cellValue(row, "Start Yr") || cellValue(row, "Start Year");
-      if (rawYear === "") {
-        return null;
-      }
+    function createYearDate(year) {
+      const date = new Date(0);
+      date.setHours(0, 0, 0, 0);
+      date.setFullYear(year, 0, 1);
+      return date;
+    }
 
-      if (rawYear.toUpperCase().indexOf("BCE") !== -1) {
-        return {
-          date: new Date(1, 0, 1),
-          isBce: true,
-          raw: rawYear
-        };
-      }
-
-      const year = toInt(rawYear);
-      if (year === null) {
-        return null;
-      }
-
-      const month = toInt(row["Start Mo"]) || toInt(row["Start Month"]);
-      const day = toInt(row["Start Day"]);
+    function yearDateInfo(year, timelineStart) {
+      const isBce = year < 0;
       return {
-        date: new Date(year, month === null ? 0 : month, day === null ? 1 : day),
-        isBce: false,
-        raw: rawYear
+        date: isBce ? new Date(timelineStart) : createYearDate(year),
+        isBce,
+        raw: isBce ? Math.abs(year) + " BCE" : String(year)
       };
-    }
-
-    function parseEndDate(row) {
-      const rawYear = cellValue(row, "End Yr") || cellValue(row, "End Year");
-      if (rawYear === "") {
-        return { date: new Date(), isBce: false, raw: "" };
-      }
-
-      if (rawYear.toUpperCase().indexOf("BCE") !== -1) {
-        return {
-          date: new Date(1, 0, 1),
-          isBce: true,
-          raw: rawYear
-        };
-      }
-
-      const year = toInt(rawYear);
-      const month = toInt(row["End Mo"]) || toInt(row["End Month"]);
-      const day = toInt(row["End Day"]);
-      return {
-        date: new Date(year, month === null ? 0 : month, day === null ? 1 : day),
-        isBce: false,
-        raw: rawYear
-      };
-    }
-
-    function normalizeType(value) {
-      return String(value == null ? "" : value).trim().toLowerCase();
     }
 
     function normalizeSubgroupId(value) {
       return String(value == null ? "" : value).trim().toLowerCase();
     }
 
-    function cleanEnergySource(value) {
-      let str = String(value == null ? "" : value).trim();
-      if (str === "") {
-        return "";
-      }
-
-      if (str.indexOf(",") !== -1) {
-        str = str.split(",")[0].trim();
-      }
-
-      if (str.indexOf("/") !== -1) {
-        const parts = str.split("/");
-        str = parts[parts.length - 1].trim();
-      }
-
-      return str;
+    function cleanParadigm(value) {
+      return String(value == null ? "" : value).trim();
     }
 
-    function cleanParadigm(value) {
-      const str = String(value == null ? "" : value).trim();
-      if (str === "") {
-        return "";
+    function normalizeParadigmKey(value) {
+      return cleanParadigm(value).toLowerCase();
+    }
+
+    function normalizeHeader(value) {
+      return String(value == null ? "" : value).trim().replace(/\s+/g, " ").toLowerCase();
+    }
+
+    function isBlankCell(value) {
+      return value == null || String(value).trim() === "";
+    }
+
+    function readSheetTable(workbook, sheetName, requiredHeaders) {
+      const worksheet = workbook.Sheets[sheetName];
+      if (!worksheet) {
+        throw new Error("Workbook is missing sheet \"" + sheetName + "\".");
       }
 
-      let result = "";
-      for (let i = 0; i < str.length; i += 1) {
-        const ch = str[i];
-        if ((ch >= "a" && ch <= "z") || (ch >= "A" && ch <= "Z") || ch === " ") {
-          result += ch;
-        } else {
-          break;
+      const table = XLSX.utils.sheet_to_json(worksheet, {
+        header: 1,
+        raw: true,
+        blankrows: false,
+        defval: null
+      });
+      if (!table.length) {
+        throw new Error("Sheet \"" + sheetName + "\" is empty.");
+      }
+
+      const headerRow = table[0] || [];
+      const headerIndexes = {};
+      for (let i = 0; i < headerRow.length; i += 1) {
+        const normalized = normalizeHeader(headerRow[i]);
+        if (normalized && headerIndexes[normalized] == null) {
+          headerIndexes[normalized] = i;
         }
       }
 
-      return result.trim();
+      const missing = requiredHeaders.filter(function (header) {
+        return headerIndexes[normalizeHeader(header)] == null;
+      });
+      if (missing.length) {
+        throw new Error(
+          "Sheet \"" + sheetName + "\" is missing required columns: " + missing.join(", ") + "."
+        );
+      }
+
+      return {
+        rows: table.slice(1),
+        columnIndex: function (header) {
+          return headerIndexes[normalizeHeader(header)];
+        }
+      };
     }
 
-    function cellValue(row, columnName) {
-      const raw = row[columnName];
-      return raw == null ? "" : String(raw).trim();
+    function parseTimelineSheet(workbook) {
+      const table = readSheetTable(workbook, TIMELINE_SHEET_NAME, TIMELINE_REQUIRED_HEADERS);
+      const titleIndex = table.columnIndex("Title");
+      const startIndex = table.columnIndex("Start");
+      const endIndex = table.columnIndex("End");
+      const incrementIndex = table.columnIndex("Increment");
+      const populatedRows = table.rows.filter(function (row) {
+        return !isBlankCell(row[titleIndex]) || !isBlankCell(row[startIndex]) ||
+          !isBlankCell(row[endIndex]) || !isBlankCell(row[incrementIndex]);
+      });
+
+      if (populatedRows.length !== 1) {
+        throw new Error("Sheet \"TIMELINE\" must contain exactly one populated configuration row.");
+      }
+
+      const row = populatedRows[0];
+      const title = String(row[titleIndex] == null ? "" : row[titleIndex]).trim();
+      const startYear = toInteger(row[startIndex]);
+      const endYear = toInteger(row[endIndex]);
+      const increment = toInteger(row[incrementIndex]);
+      if (!title) {
+        throw new Error("TIMELINE Title must not be empty.");
+      }
+      if (startYear === null || endYear === null || increment === null) {
+        throw new Error("TIMELINE Start, End, and Increment must be finite integers.");
+      }
+      if (startYear >= endYear) {
+        throw new Error("TIMELINE Start must be earlier than End.");
+      }
+      if (increment <= 0) {
+        throw new Error("TIMELINE Increment must be a positive integer.");
+      }
+
+      return { title, startYear, endYear, increment };
+    }
+
+    function parseDataSheet(workbook, sheetName) {
+      const table = readSheetTable(workbook, sheetName, DATA_REQUIRED_HEADERS);
+      const yearIndex = table.columnIndex("Start Yr");
+      const eventIndex = table.columnIndex("Event");
+      const paradigmIndex = table.columnIndex("Paradigm");
+      const events = [];
+
+      for (let i = 0; i < table.rows.length; i += 1) {
+        const row = table.rows[i] || [];
+        const rawYear = row[yearIndex];
+        const event = String(row[eventIndex] == null ? "" : row[eventIndex]).trim();
+        const paradigm = cleanParadigm(row[paradigmIndex]);
+        if (isBlankCell(rawYear) && !event && !paradigm) {
+          continue;
+        }
+
+        const startYear = toInteger(rawYear);
+        if (startYear === null) {
+          throw new Error(
+            "Sheet \"" + sheetName + "\" has an invalid Start Yr near data row " + (i + 2) + "."
+          );
+        }
+        if (!event) {
+          throw new Error(
+            "Sheet \"" + sheetName + "\" has an empty Event near data row " + (i + 2) + "."
+          );
+        }
+
+        events.push({ startYear, event, paradigm });
+      }
+
+      if (!events.length) {
+        throw new Error("Sheet \"" + sheetName + "\" has no usable event rows.");
+      }
+      return events;
+    }
+
+    function parseWorkbookData(workbook) {
+      if (!Array.isArray(workbook.SheetNames) || workbook.SheetNames.indexOf(TIMELINE_SHEET_NAME) === -1) {
+        throw new Error("Workbook must contain a sheet named \"TIMELINE\".");
+      }
+
+      const timeline = parseTimelineSheet(workbook);
+      const tabs = new Map();
+      for (let i = 0; i < workbook.SheetNames.length; i += 1) {
+        const sheetName = workbook.SheetNames[i];
+        if (sheetName === TIMELINE_SHEET_NAME) {
+          continue;
+        }
+        tabs.set(sheetName, parseDataSheet(workbook, sheetName));
+      }
+
+      if (!tabs.size) {
+        throw new Error("Workbook does not contain any data sheets.");
+      }
+      return { timeline, tabs };
     }
 
     function hashString(value) {
@@ -1910,215 +1941,112 @@
       return new Promise((resolve) => requestAnimationFrame(resolve));
     }
 
-    function tryUpdateBounds(startInfo, endInfo, bounds) {
-      if (startInfo && !startInfo.isBce && (!bounds.start || startInfo.date < bounds.start)) {
-        bounds.start = startInfo.date;
-      }
-      if (endInfo && !endInfo.isBce && (!bounds.end || endInfo.date > bounds.end)) {
-        bounds.end = endInfo.date;
-      }
-    }
-
-    function addTrendRow(row, titleToSubgroup, subgroups, items, counter) {
-      const title = String(row.Title == null ? "" : row.Title).trim();
-      if (!title) {
-        return counter;
-      }
-
-      const subgroup = normalizeSubgroupId(row.RowId);
-      if (!subgroup) {
-        return counter;
-      }
-
-      titleToSubgroup[normalizeSubgroupId(title)] = subgroup;
-      subgroups.add(subgroup);
-
-      const startInfo = parseStartDate(row);
-      if (!startInfo) {
-        return counter;
-      }
-
-      const endInfo = parseEndDate(row);
-      const startYearLabel = startInfo.raw || String(startInfo.date.getFullYear());
-      const hasDistinctEnd = Boolean(
-        endInfo &&
-        endInfo.raw &&
-        endInfo.date.getTime() !== startInfo.date.getTime()
-      );
-      const endYearLabel = hasDistinctEnd ? endInfo.raw : "";
-
-      items.push({
-        id: "trend-" + counter,
-        group: DEFAULT_GROUP_ID,
-        subgroup,
-        type: "range",
-        className: "trend-range trend-color-" + (Math.abs(hashString(subgroup)) % 8),
-        start: startInfo.date,
-        end: endInfo ? endInfo.date : new Date(),
-        startRaw: startInfo.raw,
-        endRaw: endInfo ? endInfo.raw : "",
-        startIsBce: startInfo.isBce,
-        endIsBce: endInfo ? endInfo.isBce : false,
-        startYearLabel,
-        endYearLabel,
-        titleText: title,
-        displayTitleText: title,
-        content: title
-      });
-
-      return counter + 1;
-    }
-
-    function addParadigmRow(row, subgroups, items, counter) {
-      const startInfo = parseStartDate(row);
-      if (!startInfo) {
-        return counter;
-      }
-
-      const title = String(row.Title == null ? "" : row.Title).trim();
-      const subgroup = normalizeSubgroupId(row.RowId);
-      subgroups.add(subgroup);
-
-      const endInfo = parseEndDate(row);
-      const startYearLabel = startInfo.raw || String(startInfo.date.getFullYear());
-      const endYearLabel = endInfo
-        ? (endInfo.raw || String(endInfo.date.getFullYear()))
-        : String(new Date().getFullYear());
-      const paradigmTitle = title || "Paradigm";
-
-      items.push({
-        id: "paradigm-" + counter,
-        group: PARADIGM_GROUP_ID,
-        subgroup,
-        type: "range",
-        className: "paradigm-range",
-        start: startInfo.date,
-        end: endInfo ? endInfo.date : new Date(),
-        startRaw: startInfo.raw,
-        endRaw: endInfo ? endInfo.raw : "",
-        startIsBce: startInfo.isBce,
-        endIsBce: endInfo ? endInfo.isBce : false,
-        titleText: paradigmTitle,
-        content: escapeHtml(paradigmTitle) + " (" + escapeHtml(startYearLabel) + "-" + escapeHtml(endYearLabel) + ")"
-      });
-
-      return counter + 1;
-    }
-
-    function normalizeBceDates(items, timelineStart) {
-      for (let i = 0; i < items.length; i += 1) {
-        const item = items[i];
-        if (item.startIsBce) {
-          item.start = new Date(timelineStart);
-        }
-        if (item.endIsBce) {
-          item.end = new Date(timelineStart);
-        }
-      }
-    }
-
-    function parseTimelineRows(timelineRows, config) {
-      const bounds = { start: null, end: null };
-      let timelineTitle = "";
-      const titleToSubgroup = {};
-      const trendSubgroups = new Set();
-      const trendItems = [];
-      const paradigmSubgroups = new Set();
-      const paradigmItems = [];
-      let trendCounter = 1;
-      let paradigmCounter = 1;
-
-      for (let i = 0; i < timelineRows.length; i += 1) {
-        const row = timelineRows[i];
-        const type = normalizeType(row.Type);
-        const rowId = cellValue(row, "RowId");
-        const title = cellValue(row, "Title");
-
-        if (!type && !rowId && !title) {
-          continue;
-        }
-
-        switch (type) {
-          case "timeline":
-            tryUpdateBounds(parseStartDate(row), parseEndDate(row), bounds);
-            if (!timelineTitle && title) {
-              timelineTitle = title;
-            }
-            break;
-          case config.trendType:
-            trendCounter = addTrendRow(row, titleToSubgroup, trendSubgroups, trendItems, trendCounter);
-            break;
-          case "paradigm":
-            paradigmCounter = addParadigmRow(row, paradigmSubgroups, paradigmItems, paradigmCounter);
-            break;
-          default:
-            continue;
-        }
-      }
-
-      return {
-        start: bounds.start,
-        end: bounds.end,
-        title: timelineTitle,
-        titleToSubgroup,
-        trendSubgroups,
-        trendItems,
-        paradigmSubgroups,
-        paradigmItems
+    function buildTimelineData(workbookData, config) {
+      const timelineStart = createYearDate(workbookData.timeline.startYear);
+      const timelineEnd = createYearDate(workbookData.timeline.endYear);
+      const timeline = {
+        title: workbookData.timeline.title,
+        trendSubgroups: new Set(),
+        trendItems: [],
+        paradigmSubgroups: new Set(),
+        paradigmItems: []
       };
-    }
+      const paradigms = new Map();
+      let trendCounter = 1;
+      let eventCounter = 1;
+      let eventRowCount = 0;
 
-    function parseMasterRows(masterRows, titleToSubgroup, trendSubgroups, trendItems, config) {
-      let counter = 1;
+      workbookData.tabs.forEach(function (events, sheetName) {
+        const subgroup = normalizeSubgroupId(sheetName);
+        timeline.trendSubgroups.add(subgroup);
 
-      for (let i = 0; i < masterRows.length; i += 1) {
-        const row = masterRows[i];
-        const rawTrend = cellValue(row, config.trendColumn);
-
-        if (!rawTrend) {
-          continue;
+        let minYear = Infinity;
+        let maxYear = -Infinity;
+        for (let i = 0; i < events.length; i += 1) {
+          minYear = Math.min(minYear, events[i].startYear);
+          maxYear = Math.max(maxYear, events[i].startYear);
         }
 
-        const cleanedTrend = cleanEnergySource(rawTrend);
-        const trendKey = normalizeSubgroupId(cleanedTrend);
-        const subgroup = titleToSubgroup[trendKey] || trendKey;
-        const startInfo = parseStartDate(row);
-        const description = cellValue(row, "Event");
-
-        if (!subgroup || !startInfo || !description) {
-          continue;
-        }
-
-        trendSubgroups.add(subgroup);
-
-        const energySource = cellValue(row, "Energy Source");
-
-        trendItems.push({
-          id: "event-" + counter++,
+        const rangeStart = yearDateInfo(minYear, timelineStart);
+        const rangeEnd = yearDateInfo(maxYear, timelineStart);
+        timeline.trendItems.push({
+          id: "trend-" + trendCounter++,
           group: DEFAULT_GROUP_ID,
           subgroup,
-          type: "point",
-          start: startInfo.date,
-          startRaw: startInfo.raw,
-          startIsBce: startInfo.isBce,
-          title: description,
-          paradigm: cleanParadigm(row["Paradigm"]),
-          energySource: energySource ? cleanEnergySource(energySource) : ""
+          type: "range",
+          className: "trend-range trend-color-" + (Math.abs(hashString(subgroup)) % 8),
+          start: rangeStart.date,
+          end: rangeEnd.date,
+          startRaw: rangeStart.raw,
+          endRaw: rangeEnd.raw,
+          startIsBce: rangeStart.isBce,
+          endIsBce: rangeEnd.isBce,
+          startYearLabel: rangeStart.raw,
+          endYearLabel: minYear === maxYear || maxYear === workbookData.timeline.endYear
+            ? ""
+            : rangeEnd.raw,
+          titleText: sheetName,
+          displayTitleText: sheetName,
+          content: sheetName
         });
-      }
-    }
 
-    function buildTimelineData(timelineRows, masterRows, config) {
-      const timeline = parseTimelineRows(timelineRows, config);
+        for (let i = 0; i < events.length; i += 1) {
+          const event = events[i];
+          const startInfo = yearDateInfo(event.startYear, timelineStart);
+          timeline.trendItems.push({
+            id: "event-" + eventCounter++,
+            group: DEFAULT_GROUP_ID,
+            subgroup,
+            type: "point",
+            start: startInfo.date,
+            startRaw: startInfo.raw,
+            startIsBce: startInfo.isBce,
+            title: event.event,
+            paradigm: event.paradigm,
+            energySource: sheetName
+          });
+          eventRowCount += 1;
 
-      parseMasterRows(masterRows, timeline.titleToSubgroup, timeline.trendSubgroups, timeline.trendItems, config);
+          const paradigmKey = normalizeParadigmKey(event.paradigm);
+          if (!paradigmKey) {
+            continue;
+          }
+          const existing = paradigms.get(paradigmKey);
+          if (existing) {
+            existing.minYear = Math.min(existing.minYear, event.startYear);
+            existing.maxYear = Math.max(existing.maxYear, event.startYear);
+          } else {
+            paradigms.set(paradigmKey, {
+              title: event.paradigm,
+              minYear: event.startYear,
+              maxYear: event.startYear
+            });
+          }
+        }
+      });
 
-      const now = new Date();
-      const timelineStart = timeline.start || new Date(now.getFullYear() - 100, 0, 1);
-      const timelineEnd = timeline.end || now;
+      let paradigmCounter = 1;
+      paradigms.forEach(function (paradigm, paradigmKey) {
+        const startInfo = yearDateInfo(paradigm.minYear, timelineStart);
+        const endInfo = yearDateInfo(paradigm.maxYear, timelineStart);
+        timeline.paradigmSubgroups.add(paradigmKey);
+        timeline.paradigmItems.push({
+          id: "paradigm-" + paradigmCounter++,
+          group: PARADIGM_GROUP_ID,
+          subgroup: paradigmKey,
+          type: "range",
+          className: "paradigm-range",
+          start: startInfo.date,
+          end: endInfo.date,
+          startRaw: startInfo.raw,
+          endRaw: endInfo.raw,
+          startIsBce: startInfo.isBce,
+          endIsBce: endInfo.isBce,
+          titleText: paradigm.title,
+          content: escapeHtml(paradigm.title) + " (" + escapeHtml(startInfo.raw) + "-" + escapeHtml(endInfo.raw) + ")"
+        });
+      });
 
-      normalizeBceDates(timeline.trendItems, timelineStart);
-      normalizeBceDates(timeline.paradigmItems, timelineStart);
       const span = timelineEnd.getTime() - timelineStart.getTime();
       const bufferFactor = window.innerWidth <= 768 ? 0.02 : 0.01;
       const endWithBuffer = new Date(timelineEnd.getTime() + span * bufferFactor);
@@ -2166,10 +2094,8 @@
 
       console.log('timeline height', timeline.trendSubgroups.size * TREND_ROW_HEIGHT);
 
-      const paradigmHeight = Math.max(timeline.paradigmSubgroups.size * PARADIGM_ROW_HEIGHT, PARADIGM_ROW_HEIGHT);
-
       return {
-        title: timeline.title || config.label,
+        title: timeline.title,
         // The top timeline is bottom-oriented, so reverse its subgroup comparator
         // to make the desired order read correctly from top to bottom on screen.
         trendGroups: [createGroupWithSubgroups(
@@ -2185,17 +2111,17 @@
           stackSubgroups: true,
           start: timelineStart,
           end: endWithBuffer,
-          height: Math.max(timeline.trendSubgroups.size * TREND_ROW_HEIGHT, TREND_ROW_HEIGHT),
-          _paradigmHeight: paradigmHeight
+          height: Math.max(timeline.trendSubgroups.size * TREND_ROW_HEIGHT, TREND_ROW_HEIGHT)
         },
         paradigmOptions: {
           stack: false,
           stackSubgroups: true,
           start: timelineStart,
           end: timelineEnd,
-          height: paradigmHeight
+          height: PARADIGM_TIMELINE_HEIGHT
         },
-        masterRowCount: masterRows.length
+        timeAxisStep: workbookData.timeline.increment,
+        eventRowCount
       };
     }
 
@@ -2208,8 +2134,12 @@
         : null;
 
       return {
-        min: startYear === null ? undefined : new Date(startYear, 0, 1),
-        max: endYear === null ? undefined : new Date(endYear, 11, 31)
+        min: startYear === null ? undefined : createYearDate(startYear),
+        max: endYear === null ? undefined : (function () {
+          const date = createYearDate(endYear);
+          date.setMonth(11, 31);
+          return date;
+        })()
       };
     }
 
@@ -2226,9 +2156,7 @@
         : Math.max(window.innerHeight - 160, 240);
       const paradigmHeight = paradigmShell && !paradigmShell.classList.contains("hidden") && paradigmShell.clientHeight > 0
         ? paradigmShell.clientHeight
-        : (currentTrendOptions && typeof currentTrendOptions._paradigmHeight === "number"
-          ? currentTrendOptions._paradigmHeight
-          : 96);
+        : PARADIGM_TIMELINE_HEIGHT;
 
       return Math.max(stageHeight - paradigmHeight, TREND_ROW_HEIGHT * 4);
     }
@@ -2240,6 +2168,11 @@
 
       const wrapper = document.createElement("span");
       wrapper.className = "trend-content";
+
+      const exportLine = document.createElement("span");
+      exportLine.className = "trend-export-line";
+      exportLine.setAttribute("aria-hidden", "true");
+      wrapper.appendChild(exportLine);
 
       const startYear = document.createElement("span");
       startYear.className = "trend-start-year";
@@ -2295,10 +2228,11 @@
       return {
         ...baseOptions,
         ...bounds,
-        height: (baseOptions.height || PARADIGM_ROW_HEIGHT) + "px",
+        height: PARADIGM_TIMELINE_HEIGHT + "px",
         orientation: "top",
-        verticalScroll: false,
+        verticalScroll: true,
         zoomable: true,
+        zoomKey: "ctrlKey",
         moveable: true,
         selectable: true,
         groupHeightMode: "fixed",
@@ -2451,9 +2385,9 @@
       }
 
       try {
-        trendTimelineInstance = new vis.Timeline(el.timelineTop, trendItems, trendGroups, buildTopOptions(data.trendOptions, 25));
+        trendTimelineInstance = new vis.Timeline(el.timelineTop, trendItems, trendGroups, buildTopOptions(data.trendOptions, data.timeAxisStep));
       } catch (error) {
-        trendTimelineInstance = new vis.Timeline(el.timelineTop, trendItems, trendGroups, buildTopOptions(data.trendOptions, 25));
+        trendTimelineInstance = new vis.Timeline(el.timelineTop, trendItems, trendGroups, buildTopOptions(data.trendOptions, data.timeAxisStep));
       }
 
       trendTimelineInstance.setWindow(data.trendOptions.start, data.trendOptions.end, { animation: false });
@@ -2589,9 +2523,9 @@
     }
 
     function showParadigmModal(paradigmTitle) {
-      const paradigmKey = normalizeSubgroupId(cleanParadigm(paradigmTitle));
+      const paradigmKey = normalizeParadigmKey(paradigmTitle);
       const events = currentTrendItems.filter(function (item) {
-        return item.type === "point" && normalizeSubgroupId(item.paradigm) === paradigmKey;
+        return item.type === "point" && normalizeParadigmKey(item.paradigm) === paradigmKey;
       });
       showEventsModal(paradigmTitle, events, "No events recorded for this paradigm.");
     }
@@ -2820,6 +2754,24 @@
       ]);
     }
 
+    function neutralizeExportBackgroundImages(clonedDocument) {
+      if (!clonedDocument.head) {
+        return;
+      }
+
+      // html2canvas rasterizes every CSS gradient into an intermediate canvas
+      // and calls createPattern with it. vis-timeline can produce zero-width
+      // range/background boxes, making that intermediate canvas invalid. The
+      // meaningful timeline gradients have export-safe CSS/DOM replacements,
+      // so disable background images throughout the detached export document.
+      const exportSafetyStyle = clonedDocument.createElement("style");
+      exportSafetyStyle.textContent = [
+        "html, body, #timelineStage, #timelineStage * { background-image: none !important; }",
+        "#timelineStage *::before, #timelineStage *::after { background-image: none !important; }"
+      ].join("\n");
+      clonedDocument.head.appendChild(exportSafetyStyle);
+    }
+
     async function exportTimelineAsJpeg() {
       const buttons = getExportButtons();
       const originalLabels = buttons.map(function (btn) { return btn.textContent; });
@@ -2915,6 +2867,7 @@
         });
         paradigmTimelineInstance.setOptions({
           height: fullParadigmHeight + "px",
+          verticalScroll: false,
           groupHeightMode: "fitItems",
           min: exportStart,
           max: exactExportEnd
@@ -2944,7 +2897,8 @@
           width: targetExportWidth,
           windowWidth: targetExportWidth,
           useCORS: true,
-          logging: false
+          logging: false,
+          onclone: neutralizeExportBackgroundImages
         };
         const timelineCanvas = await html2canvas(el.timelineStage, options);
         let exportCanvas = timelineCanvas;
@@ -3003,7 +2957,8 @@
             });
             paradigmTimelineInstance.setOptions({
               ...paradigmBounds,
-              height: (currentParadigmOptions.height || PARADIGM_ROW_HEIGHT) + "px",
+              height: PARADIGM_TIMELINE_HEIGHT + "px",
+              verticalScroll: true,
               groupHeightMode: "fixed"
             });
             trendTimelineInstance.redraw();
@@ -3048,7 +3003,7 @@
     }
 
     function configIsValid(config) {
-      return config && config.publishedBase && config.sheetGids.timeline && config.sheetGids.master;
+      return config && config.workbookUrl;
     }
 
     async function loadAndRenderTimeline(forceRefresh) {
@@ -3062,8 +3017,7 @@
 
       isLoading = true;
       const t0 = performance.now();
-      let timelineRows;
-      let masterRows;
+      let workbookData;
       let fromCache = false;
 
       if (forceRefresh) {
@@ -3071,23 +3025,20 @@
       }
 
       if (tabCache[activeTabKey]) {
-        timelineRows = tabCache[activeTabKey].timelineRows;
-        masterRows = tabCache[activeTabKey].masterRows;
+        workbookData = tabCache[activeTabKey].workbookData;
         fromCache = true;
       } else {
-        setLoadingState("Loading Timeline and Master sheets...");
+        setLoadingState("Loading Google Sheets workbook...");
 
         try {
-          const results = await Promise.all([
-            fetchSheetRows(SHEET_NAMES.timeline, "timeline", config),
-            fetchSheetRows(SHEET_NAMES.master, "master", config)
-          ]);
+          const workbook = await fetchWorkbook(config);
           if (gen !== loadGeneration) {
             return;
           }
-          timelineRows = results[0];
-          masterRows = results[1];
-          tabCache[activeTabKey] = { timelineRows, masterRows };
+          setLoadingState("Parsing workbook sheets...");
+          await nextTick();
+          workbookData = parseWorkbookData(workbook);
+          tabCache[activeTabKey] = { workbookData };
         } catch (error) {
           if (gen !== loadGeneration) {
             return;
@@ -3107,7 +3058,8 @@
         await nextTick();
         setLoadingState("Preparing timeline data...");
 
-        const data = buildTimelineData(timelineRows, masterRows, config);
+        const data = buildTimelineData(workbookData, config);
+        console.log('timeline data', data);
         const elapsed = ((performance.now() - t0) / 1000).toFixed(1);
 
         if (data.trendItems.length + data.paradigmItems.length === 0) {
@@ -3125,7 +3077,7 @@
 
         const source = fromCache ? " (cached)" : "";
         setReadyState(
-          "Timeline loaded in " + elapsed + "s" + source + ". Master rows: " + data.masterRowCount +
+          "Timeline loaded in " + elapsed + "s" + source + ". Event rows: " + data.eventRowCount +
           ". Items: " + (data.trendItems.length + data.paradigmItems.length) + "."
         );
         refreshVisibleTimelines();
