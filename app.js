@@ -1658,10 +1658,9 @@ async function loadAndRenderTimeline(forceRefresh) {
     renderTimeline(data);
 
     const source = fromCache ? " (cached)" : "";
-    setReadyState(
-      "Timeline loaded in " + elapsed + "s" + source + ". Event rows: " + data.eventRowCount +
-      ". Items: " + (data.trendItems.length + data.paradigmItems.length) + "."
-    );
+    // const message = "Timeline loaded in " + elapsed + "s" + source + ". Event rows: " + data.eventRowCount +
+    //     ". Items: " + (data.trendItems.length + data.paradigmItems.length) + ".";
+    setReadyState();
     refreshVisibleTimelines();
   } catch (error) {
     const msg = error && error.message ? error.message : "Unknown error";
