@@ -677,8 +677,6 @@ function positionDefaultTimelineRangeTitles() {
     const panelBounds = trendPanel.getBoundingClientRect();
     const panelLeft = panelBounds.left + 8;
     const panelRight = panelBounds.right - 8;
-    const panelTop = panelBounds.top + 2;
-    const panelBottom = panelBounds.bottom - 2;
 
     for (let i = 0; i < trendRanges.length; i += 1) {
       const range = trendRanges[i];
@@ -688,19 +686,10 @@ function positionDefaultTimelineRangeTitles() {
       }
 
       title.style.removeProperty("--trend-title-left");
-      title.style.removeProperty("--trend-title-top");
-      const rangeBounds = range.getBoundingClientRect();
       const titleBounds = title.getBoundingClientRect();
       let targetLeft = Math.max(titleBounds.left, panelLeft);
       if (targetLeft + titleBounds.width > panelRight) {
         targetLeft = Math.max(panelLeft, panelRight - titleBounds.width);
-      }
-      let targetTop = titleBounds.top;
-      if (rangeBounds.bottom > panelTop && rangeBounds.top < panelBottom) {
-        targetTop = Math.max(titleBounds.top, panelTop);
-        if (targetTop + titleBounds.height > panelBottom) {
-          targetTop = Math.max(panelTop, panelBottom - titleBounds.height);
-        }
       }
 
       // Translate from the title's actual rendered location instead of from
@@ -708,7 +697,6 @@ function positionDefaultTimelineRangeTitles() {
       // outside the current window, so their range-relative coordinates are
       // not a reliable on-screen anchor.
       title.style.setProperty("--trend-title-left", (targetLeft - titleBounds.left) + "px");
-      title.style.setProperty("--trend-title-top", (targetTop - titleBounds.top) + "px");
     }
   }
 
@@ -718,8 +706,6 @@ function positionDefaultTimelineRangeTitles() {
     const panelBounds = paradigmPanel.getBoundingClientRect();
     const panelLeft = panelBounds.left + 8;
     const panelRight = panelBounds.right - 8;
-    const panelTop = panelBounds.top + 2;
-    const panelBottom = panelBounds.bottom - 2;
 
     for (let i = 0; i < paradigmRanges.length; i += 1) {
       const range = paradigmRanges[i];
@@ -729,23 +715,13 @@ function positionDefaultTimelineRangeTitles() {
       }
 
       content.style.removeProperty("--paradigm-title-left");
-      content.style.removeProperty("--paradigm-title-top");
-      const rangeBounds = range.getBoundingClientRect();
       const contentBounds = content.getBoundingClientRect();
       let targetLeft = Math.max(contentBounds.left, panelLeft);
       if (targetLeft + contentBounds.width > panelRight) {
         targetLeft = Math.max(panelLeft, panelRight - contentBounds.width);
       }
-      let targetTop = contentBounds.top;
-      if (rangeBounds.bottom > panelTop && rangeBounds.top < panelBottom) {
-        targetTop = Math.max(contentBounds.top, panelTop);
-        if (targetTop + contentBounds.height > panelBottom) {
-          targetTop = Math.max(panelTop, panelBottom - contentBounds.height);
-        }
-      }
 
       content.style.setProperty("--paradigm-title-left", (targetLeft - contentBounds.left) + "px");
-      content.style.setProperty("--paradigm-title-top", (targetTop - contentBounds.top) + "px");
     }
   }
 }

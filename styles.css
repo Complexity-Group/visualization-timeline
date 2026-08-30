@@ -684,10 +684,7 @@
       padding: 5px 10px;
       white-space: nowrap;
       overflow: visible;
-      transform: translate(
-        var(--paradigm-title-left, 0px),
-        var(--paradigm-title-top, 0px)
-      ) !important;
+      transform: translateX(var(--paradigm-title-left, 0px)) !important;
       z-index: 2;
     }
 
@@ -833,10 +830,7 @@
       top: -2px;
       left: 6px;
       white-space: nowrap;
-      transform: translate(
-        var(--trend-title-left, 0px),
-        var(--trend-title-top, 0px)
-      );
+      transform: translateX(var(--trend-title-left, 0px));
       z-index: 2;
     }
 
