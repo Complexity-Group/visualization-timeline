@@ -22,7 +22,6 @@
       --paradigm-export-border: #cfb99a;
       --paradigm-accent: #a67c2e;
       --paradigm-ink: #5c3f12;
-      --paradigm-timeline-height: 200px;
       --shadow-sm: 0 1px 2px rgba(26, 35, 50, 0.05);
       --shadow-md: 0 8px 28px rgba(26, 35, 50, 0.08);
       --header-h: auto;
@@ -561,7 +560,8 @@
     }
 
     .timeline-top-shell {
-      flex: 1 1 auto;
+      flex: 1 1 0;
+      height: 50%;
       min-height: 0;
       border-bottom: 1px solid var(--border);
       display: flex;
@@ -569,12 +569,9 @@
     }
 
     .timeline-bottom-shell {
-      flex: 0 0 200px;
-      flex: 0 0 var(--paradigm-timeline-height);
-      height: 200px;
-      height: var(--paradigm-timeline-height);
-      min-height: 200px;
-      min-height: var(--paradigm-timeline-height);
+      flex: 1 1 0;
+      height: 50%;
+      min-height: 0;
       background:
         linear-gradient(180deg, rgba(166, 124, 46, 0.06), transparent 48px),
         var(--bg-elevated);

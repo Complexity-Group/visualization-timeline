@@ -4,7 +4,6 @@ import { normalizeParadigmKey, parseWorkbookData } from "./workbook.js";
 const DEFAULT_GROUP_ID = "default";
 const PARADIGM_GROUP_ID = "paradigms";
 const TREND_ROW_HEIGHT = 40;
-const PARADIGM_TIMELINE_HEIGHT = 200;
 
 let trendTimelineInstance = null;
 let paradigmTimelineInstance = null;
@@ -392,8 +391,7 @@ function buildTimelineData(workbookData, config) {
       stack: false,
       stackSubgroups: true,
       start: timelineStart,
-      end: timelineEnd,
-      height: PARADIGM_TIMELINE_HEIGHT
+      end: timelineEnd
     },
     timeAxisStep: workbookData.timeline.increment,
     eventRowCount
@@ -418,22 +416,23 @@ function buildBounds(baseOptions) {
   };
 }
 
-function getAvailableTopTimelineHeight() {
-  const shell = el.timelineShell;
-  if (shell && !shell.classList.contains("hidden") && shell.clientHeight > 0) {
-    return Math.max(shell.clientHeight, TREND_ROW_HEIGHT);
+function getAvailableTimelineHeight() {
+  const chartArea = el.timelineChartArea;
+  if (chartArea && !chartArea.classList.contains("hidden") && chartArea.clientHeight > 0) {
+    return Math.max(Math.floor(chartArea.clientHeight / 2), TREND_ROW_HEIGHT);
   }
 
   const stage = el.timelineStage;
-  const paradigmShell = el.paradigmShell;
   const stageHeight = stage && stage.clientHeight > 0
     ? stage.clientHeight
     : Math.max(window.innerHeight - 160, 240);
-  const paradigmHeight = paradigmShell && !paradigmShell.classList.contains("hidden") && paradigmShell.clientHeight > 0
-    ? paradigmShell.clientHeight
-    : PARADIGM_TIMELINE_HEIGHT;
+  const titleHeight = el.timelineTitle && !el.timelineTitle.classList.contains("hidden")
+    ? el.timelineTitle.getBoundingClientRect().height
+    : 0;
 
-  return Math.max(stageHeight - paradigmHeight, TREND_ROW_HEIGHT * 4);
+  // The stage is the viewport space left after the chrome header. Split only
+  // that available chart height so both timelines always receive equal space.
+  return Math.max(Math.floor((stageHeight - titleHeight) / 2), TREND_ROW_HEIGHT);
 }
 
 function buildTrendItemTemplate(item) {
@@ -485,7 +484,7 @@ function buildParadigmItemTemplate(item) {
 
 function buildTopOptions(baseOptions, timeAxisStep) {
   const bounds = buildBounds(baseOptions);
-  const heightPx = getAvailableTopTimelineHeight();
+  const heightPx = getAvailableTimelineHeight();
   return {
     ...baseOptions,
     ...bounds,
@@ -514,10 +513,11 @@ function buildTopOptions(baseOptions, timeAxisStep) {
 
 function buildBottomOptions(baseOptions) {
   const bounds = buildBounds(baseOptions);
+  const heightPx = getAvailableTimelineHeight();
   return {
     ...baseOptions,
     ...bounds,
-    height: PARADIGM_TIMELINE_HEIGHT + "px",
+    height: heightPx + "px",
     orientation: "top",
     verticalScroll: true,
     zoomable: true,
@@ -541,18 +541,20 @@ function buildBottomOptions(baseOptions) {
   };
 }
 
-let lastAppliedTopHeight = null;
+let lastAppliedTimelineHeight = null;
 
-function applyTopTimelineHeight() {
-  if (!trendTimelineInstance) {
+function applyTimelineHeights() {
+  if (!trendTimelineInstance || !paradigmTimelineInstance) {
     return;
   }
-  const heightPx = Math.round(getAvailableTopTimelineHeight());
-  if (lastAppliedTopHeight === heightPx) {
+  const heightPx = Math.round(getAvailableTimelineHeight());
+  if (lastAppliedTimelineHeight === heightPx) {
     return false;
   }
-  lastAppliedTopHeight = heightPx;
+  lastAppliedTimelineHeight = heightPx;
   trendTimelineInstance.setOptions({ height: heightPx + "px" });
+  paradigmTimelineInstance.setOptions({ height: heightPx + "px" });
+  el.timelineLabelRail.style.setProperty("--paradigm-label-height", heightPx + "px");
   return true;
 }
 
@@ -582,12 +584,12 @@ function refreshVisibleTimelines() {
 
   // Timelines are created while containers are hidden; redraw once visible so axis/layout paints correctly.
   requestAnimationFrame(() => {
-    applyTopTimelineHeight();
+    applyTimelineHeights();
     trendTimelineInstance.redraw();
     paradigmTimelineInstance.redraw();
 
     requestAnimationFrame(() => {
-      applyTopTimelineHeight();
+      applyTimelineHeights();
       trendTimelineInstance.redraw();
       paradigmTimelineInstance.redraw();
 
@@ -805,12 +807,12 @@ function renderTimeline(data) {
   indexTimelineItems(currentTrendItems, currentParadigmItems);
   currentTrendOptions = data.trendOptions;
   currentParadigmOptions = data.paradigmOptions;
-  lastAppliedTopHeight = null;
+  lastAppliedTimelineHeight = null;
   el.timelineTitle.textContent = data.title;
   el.trendSectionLabel.textContent = TIMELINE_CONFIGS[activeTabKey].label;
   el.timelineLabelRail.style.setProperty(
     "--paradigm-label-height",
-    data.paradigmOptions.height + "px"
+    getAvailableTimelineHeight() + "px"
   );
 
   const trendItems = new vis.DataSet(data.trendItems);
@@ -1495,12 +1497,6 @@ async function exportTimelineAsJpeg() {
   } finally {
     try {
       clearExportLayoutStyles();
-      if (currentParadigmOptions) {
-        el.timelineLabelRail.style.setProperty(
-          "--paradigm-label-height",
-          currentParadigmOptions.height + "px"
-        );
-      }
       isExportingImage = false;
       activeExportWindow = null;
       el.timelineStage.classList.remove("is-exporting-image");
@@ -1509,16 +1505,17 @@ async function exportTimelineAsJpeg() {
       if (trendTimelineInstance && paradigmTimelineInstance && currentTrendOptions && currentParadigmOptions) {
         const trendBounds = buildBounds(currentTrendOptions);
         const paradigmBounds = buildBounds(currentParadigmOptions);
-        lastAppliedTopHeight = null;
+        lastAppliedTimelineHeight = null;
+        const timelineHeight = getAvailableTimelineHeight();
         trendTimelineInstance.setOptions({
           ...trendBounds,
-          height: getAvailableTopTimelineHeight() + "px",
+          height: timelineHeight + "px",
           verticalScroll: true,
           groupHeightMode: "fixed"
         });
         paradigmTimelineInstance.setOptions({
           ...paradigmBounds,
-          height: PARADIGM_TIMELINE_HEIGHT + "px",
+          height: timelineHeight + "px",
           verticalScroll: true,
           groupHeightMode: "fixed"
         });
@@ -1702,7 +1699,7 @@ function setFullscreenMode(nextFullscreen) {
   el.widgetRoot.classList.remove("fs-enter", "fs-exit");
   el.widgetRoot.classList.add(isFullscreen ? "fs-enter" : "fs-exit");
   updateFullscreenButtonState();
-  lastAppliedTopHeight = null;
+  lastAppliedTimelineHeight = null;
 
   if (fullscreenTransitionTimer !== null) {
     clearTimeout(fullscreenTransitionTimer);
@@ -1711,7 +1708,7 @@ function setFullscreenMode(nextFullscreen) {
   requestAnimationFrame(function () {
     scheduleTimelineResize();
     requestAnimationFrame(function () {
-      applyTopTimelineHeight();
+      applyTimelineHeights();
       if (trendTimelineInstance) {
         trendTimelineInstance.redraw();
       }
@@ -1724,7 +1721,7 @@ function setFullscreenMode(nextFullscreen) {
   fullscreenTransitionTimer = setTimeout(function () {
     el.widgetRoot.classList.remove("fs-enter", "fs-exit");
     fullscreenTransitionTimer = null;
-    lastAppliedTopHeight = null;
+    lastAppliedTimelineHeight = null;
     scheduleTimelineResize();
   }, 360);
 }
@@ -1804,7 +1801,7 @@ function scheduleTimelineResize() {
     if (!trendTimelineInstance || !paradigmTimelineInstance) {
       return;
     }
-    const changed = applyTopTimelineHeight();
+    const changed = applyTimelineHeights();
     if (changed) {
       trendTimelineInstance.redraw();
       paradigmTimelineInstance.redraw();
