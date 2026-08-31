@@ -3,7 +3,8 @@ import { normalizeParadigmKey, parseWorkbookData } from "./workbook.js";
 
 const DEFAULT_GROUP_ID = "default";
 const PARADIGM_GROUP_ID = "paradigms";
-const TREND_ROW_HEIGHT = 40;
+const TREND_ROW_HEIGHT = 34;
+const TREND_TIME_AXIS_HEIGHT = 34;
 
 let trendTimelineInstance = null;
 let paradigmTimelineInstance = null;
@@ -385,7 +386,7 @@ function buildTimelineData(workbookData, config) {
       stackSubgroups: true,
       start: timelineStart,
       end: endWithBuffer,
-      height: Math.max(timeline.trendSubgroups.size * TREND_ROW_HEIGHT, TREND_ROW_HEIGHT)
+      height: Math.max(timeline.trendSubgroups.size * TREND_ROW_HEIGHT, TREND_ROW_HEIGHT) + TREND_TIME_AXIS_HEIGHT
     },
     paradigmOptions: {
       stack: false,
@@ -419,7 +420,7 @@ function buildBounds(baseOptions) {
 function getAvailableTimelineHeight() {
   const chartArea = el.timelineChartArea;
   if (chartArea && !chartArea.classList.contains("hidden") && chartArea.clientHeight > 0) {
-    return Math.max(Math.floor(chartArea.clientHeight / 2), TREND_ROW_HEIGHT);
+    return Math.max(chartArea.clientHeight, 2);
   }
 
   const stage = el.timelineStage;
@@ -430,9 +431,38 @@ function getAvailableTimelineHeight() {
     ? el.timelineTitle.getBoundingClientRect().height
     : 0;
 
-  // The stage is the viewport space left after the chrome header. Split only
-  // that available chart height so both timelines always receive equal space.
-  return Math.max(Math.floor((stageHeight - titleHeight) / 2), TREND_ROW_HEIGHT);
+  // The stage is the viewport space left after the chrome header.
+  return Math.max(Math.floor(stageHeight - titleHeight), 2);
+}
+
+function calculateTimelineHeights(trendOptions) {
+  const availableHeight = getAvailableTimelineHeight();
+  const requiredTrendHeight = Math.max(
+    Math.round(trendOptions && trendOptions.height
+      ? trendOptions.height
+      : TREND_ROW_HEIGHT + TREND_TIME_AXIS_HEIGHT),
+    TREND_ROW_HEIGHT
+  );
+
+  if (requiredTrendHeight * 1.5 > availableHeight) {
+    const equalHeight = Math.floor(availableHeight / 2);
+    return {
+      trendHeight: equalHeight,
+      paradigmHeight: equalHeight
+    };
+  }
+
+  return {
+    trendHeight: requiredTrendHeight,
+    paradigmHeight: availableHeight - requiredTrendHeight
+  };
+}
+
+function applyTimelineShellHeights(heights) {
+  el.timelineShell.style.flex = "0 0 " + heights.trendHeight + "px";
+  el.timelineShell.style.height = heights.trendHeight + "px";
+  el.paradigmShell.style.flex = "0 0 " + heights.paradigmHeight + "px";
+  el.paradigmShell.style.height = heights.paradigmHeight + "px";
 }
 
 function buildTrendItemTemplate(item) {
@@ -484,11 +514,11 @@ function buildParadigmItemTemplate(item) {
 
 function buildTopOptions(baseOptions, timeAxisStep) {
   const bounds = buildBounds(baseOptions);
-  const heightPx = getAvailableTimelineHeight();
+  const heights = calculateTimelineHeights(baseOptions);
   return {
     ...baseOptions,
     ...bounds,
-    height: heightPx + "px",
+    height: heights.trendHeight + "px",
     zoomMin: 1000 * 60 * 60 * 24 * 365,
     orientation: "bottom",
     verticalScroll: true,
@@ -513,11 +543,11 @@ function buildTopOptions(baseOptions, timeAxisStep) {
 
 function buildBottomOptions(baseOptions) {
   const bounds = buildBounds(baseOptions);
-  const heightPx = getAvailableTimelineHeight();
+  const heights = calculateTimelineHeights(currentTrendOptions);
   return {
     ...baseOptions,
     ...bounds,
-    height: heightPx + "px",
+    height: heights.paradigmHeight + "px",
     orientation: "top",
     verticalScroll: true,
     zoomable: true,
@@ -541,20 +571,25 @@ function buildBottomOptions(baseOptions) {
   };
 }
 
-let lastAppliedTimelineHeight = null;
+let lastAppliedTimelineHeights = null;
 
 function applyTimelineHeights() {
-  if (!trendTimelineInstance || !paradigmTimelineInstance) {
-    return;
-  }
-  const heightPx = Math.round(getAvailableTimelineHeight());
-  if (lastAppliedTimelineHeight === heightPx) {
+  // Export temporarily expands both timelines to their complete content
+  // heights. A ResizeObserver fires during that expansion, so responsive
+  // sizing must not overwrite the export-only dimensions.
+  if (isExportingImage || !trendTimelineInstance || !paradigmTimelineInstance) {
     return false;
   }
-  lastAppliedTimelineHeight = heightPx;
-  trendTimelineInstance.setOptions({ height: heightPx + "px" });
-  paradigmTimelineInstance.setOptions({ height: heightPx + "px" });
-  el.timelineLabelRail.style.setProperty("--paradigm-label-height", heightPx + "px");
+  const heights = calculateTimelineHeights(currentTrendOptions);
+  const heightKey = heights.trendHeight + ":" + heights.paradigmHeight;
+  if (lastAppliedTimelineHeights === heightKey) {
+    return false;
+  }
+  lastAppliedTimelineHeights = heightKey;
+  applyTimelineShellHeights(heights);
+  trendTimelineInstance.setOptions({ height: heights.trendHeight + "px" });
+  paradigmTimelineInstance.setOptions({ height: heights.paradigmHeight + "px" });
+  el.timelineLabelRail.style.setProperty("--paradigm-label-height", heights.paradigmHeight + "px");
   return true;
 }
 
@@ -807,12 +842,14 @@ function renderTimeline(data) {
   indexTimelineItems(currentTrendItems, currentParadigmItems);
   currentTrendOptions = data.trendOptions;
   currentParadigmOptions = data.paradigmOptions;
-  lastAppliedTimelineHeight = null;
+  lastAppliedTimelineHeights = null;
   el.timelineTitle.textContent = data.title;
   el.trendSectionLabel.textContent = TIMELINE_CONFIGS[activeTabKey].label;
+  const initialHeights = calculateTimelineHeights(data.trendOptions);
+  applyTimelineShellHeights(initialHeights);
   el.timelineLabelRail.style.setProperty(
     "--paradigm-label-height",
-    getAvailableTimelineHeight() + "px"
+    initialHeights.paradigmHeight + "px"
   );
 
   const trendItems = new vis.DataSet(data.trendItems);
@@ -1451,6 +1488,13 @@ async function exportTimelineAsJpeg() {
 
     await nextAnimationFrame();
     await nextAnimationFrame();
+    // Expanding a bottom-oriented timeline can preserve its former negative
+    // vertical offset, which pushes the first rows down and leaves blank space
+    // above them in the exported image. Reset after the expanded layout has
+    // settled, then allow the corrective redraw to finish before capture.
+    scrollTopTimelineToFirstRow();
+    await nextAnimationFrame();
+    await nextAnimationFrame();
     anchorTrendEndpointYears();
 
     const options = {
@@ -1505,17 +1549,22 @@ async function exportTimelineAsJpeg() {
       if (trendTimelineInstance && paradigmTimelineInstance && currentTrendOptions && currentParadigmOptions) {
         const trendBounds = buildBounds(currentTrendOptions);
         const paradigmBounds = buildBounds(currentParadigmOptions);
-        lastAppliedTimelineHeight = null;
-        const timelineHeight = getAvailableTimelineHeight();
+        lastAppliedTimelineHeights = null;
+        const timelineHeights = calculateTimelineHeights(currentTrendOptions);
+        applyTimelineShellHeights(timelineHeights);
+        el.timelineLabelRail.style.setProperty(
+          "--paradigm-label-height",
+          timelineHeights.paradigmHeight + "px"
+        );
         trendTimelineInstance.setOptions({
           ...trendBounds,
-          height: timelineHeight + "px",
+          height: timelineHeights.trendHeight + "px",
           verticalScroll: true,
           groupHeightMode: "fixed"
         });
         paradigmTimelineInstance.setOptions({
           ...paradigmBounds,
-          height: timelineHeight + "px",
+          height: timelineHeights.paradigmHeight + "px",
           verticalScroll: true,
           groupHeightMode: "fixed"
         });
@@ -1699,7 +1748,7 @@ function setFullscreenMode(nextFullscreen) {
   el.widgetRoot.classList.remove("fs-enter", "fs-exit");
   el.widgetRoot.classList.add(isFullscreen ? "fs-enter" : "fs-exit");
   updateFullscreenButtonState();
-  lastAppliedTimelineHeight = null;
+  lastAppliedTimelineHeights = null;
 
   if (fullscreenTransitionTimer !== null) {
     clearTimeout(fullscreenTransitionTimer);
@@ -1721,7 +1770,7 @@ function setFullscreenMode(nextFullscreen) {
   fullscreenTransitionTimer = setTimeout(function () {
     el.widgetRoot.classList.remove("fs-enter", "fs-exit");
     fullscreenTransitionTimer = null;
-    lastAppliedTimelineHeight = null;
+    lastAppliedTimelineHeights = null;
     scheduleTimelineResize();
   }, 360);
 }
@@ -1798,7 +1847,7 @@ function scheduleTimelineResize() {
   }
   resizeFrame = requestAnimationFrame(function () {
     resizeFrame = null;
-    if (!trendTimelineInstance || !paradigmTimelineInstance) {
+    if (isExportingImage || !trendTimelineInstance || !paradigmTimelineInstance) {
       return;
     }
     const changed = applyTimelineHeights();
