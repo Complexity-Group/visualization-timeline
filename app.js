@@ -140,10 +140,10 @@ function createYearDate(year) {
   return date;
 }
 
-function yearDateInfo(year, timelineStart) {
+function yearDateInfo(year) {
   const isBce = year < 0;
   return {
-    date: isBce ? new Date(timelineStart) : createYearDate(year),
+    date: createYearDate(isBce ? 0 : year),
     isBce,
     raw: isBce ? Math.abs(year) + " BCE" : String(year)
   };
@@ -272,8 +272,8 @@ function buildTimelineData(workbookData, config) {
       maxYear = Math.max(maxYear, events[i].startYear);
     }
 
-    const rangeStart = yearDateInfo(minYear, timelineStart);
-    const rangeEnd = yearDateInfo(maxYear, timelineStart);
+    const rangeStart = yearDateInfo(minYear);
+    const rangeEnd = yearDateInfo(maxYear);
     const endpointClasses = rangeStart.date.getTime() === timelineStart.getTime()
       ? " arrow-right"
       : " arrow-right dot-left";
@@ -300,7 +300,7 @@ function buildTimelineData(workbookData, config) {
 
     for (let i = 0; i < events.length; i += 1) {
       const event = events[i];
-      const startInfo = yearDateInfo(event.startYear, timelineStart);
+      const startInfo = yearDateInfo(event.startYear);
       timeline.trendItems.push({
         id: "event-" + eventCounter++,
         group: DEFAULT_GROUP_ID,
@@ -335,8 +335,8 @@ function buildTimelineData(workbookData, config) {
 
   let paradigmCounter = 1;
   paradigms.forEach(function (paradigm, paradigmKey) {
-    const startInfo = yearDateInfo(paradigm.minYear, timelineStart);
-    const endInfo = yearDateInfo(paradigm.maxYear, timelineStart);
+    const startInfo = yearDateInfo(paradigm.minYear);
+    const endInfo = yearDateInfo(paradigm.maxYear);
     timeline.paradigmSubgroups.add(paradigmKey);
     timeline.paradigmItems.push({
       id: "paradigm-" + paradigmCounter++,
