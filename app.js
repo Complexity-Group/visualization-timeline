@@ -458,11 +458,22 @@ function calculateTimelineHeights(trendOptions) {
   };
 }
 
+function getInitialTimelineHeight() {
+  return Math.max(Math.floor(getAvailableTimelineHeight() / 2), 1);
+}
+
 function applyTimelineShellHeights(heights) {
   el.timelineShell.style.flex = "0 0 " + heights.trendHeight + "px";
   el.timelineShell.style.height = heights.trendHeight + "px";
   el.paradigmShell.style.flex = "0 0 " + heights.paradigmHeight + "px";
   el.paradigmShell.style.height = heights.paradigmHeight + "px";
+}
+
+function resetTimelineShellHeights() {
+  el.timelineShell.style.removeProperty("flex");
+  el.timelineShell.style.removeProperty("height");
+  el.paradigmShell.style.removeProperty("flex");
+  el.paradigmShell.style.removeProperty("height");
 }
 
 function buildTrendItemTemplate(item) {
@@ -514,11 +525,11 @@ function buildParadigmItemTemplate(item) {
 
 function buildTopOptions(baseOptions, timeAxisStep) {
   const bounds = buildBounds(baseOptions);
-  const heights = calculateTimelineHeights(baseOptions);
+  const initialHeight = getInitialTimelineHeight();
   return {
     ...baseOptions,
     ...bounds,
-    height: heights.trendHeight + "px",
+    height: initialHeight + "px",
     zoomMin: 1000 * 60 * 60 * 24 * 365,
     orientation: "bottom",
     verticalScroll: true,
@@ -543,11 +554,11 @@ function buildTopOptions(baseOptions, timeAxisStep) {
 
 function buildBottomOptions(baseOptions) {
   const bounds = buildBounds(baseOptions);
-  const heights = calculateTimelineHeights(currentTrendOptions);
+  const initialHeight = getInitialTimelineHeight();
   return {
     ...baseOptions,
     ...bounds,
-    height: heights.paradigmHeight + "px",
+    height: initialHeight + "px",
     orientation: "top",
     verticalScroll: true,
     zoomable: true,
@@ -619,7 +630,8 @@ function refreshVisibleTimelines() {
 
   // Timelines are created while containers are hidden; redraw once visible so axis/layout paints correctly.
   requestAnimationFrame(() => {
-    applyTimelineHeights();
+    // First paint both timelines using the equal heights they were initialized
+    // with. Adaptive sizing is applied only after vis has a valid visible DOM.
     trendTimelineInstance.redraw();
     paradigmTimelineInstance.redraw();
 
@@ -845,11 +857,11 @@ function renderTimeline(data) {
   lastAppliedTimelineHeights = null;
   el.timelineTitle.textContent = data.title;
   el.trendSectionLabel.textContent = TIMELINE_CONFIGS[activeTabKey].label;
-  const initialHeights = calculateTimelineHeights(data.trendOptions);
-  applyTimelineShellHeights(initialHeights);
+  resetTimelineShellHeights();
+  const initialHeight = getInitialTimelineHeight();
   el.timelineLabelRail.style.setProperty(
     "--paradigm-label-height",
-    initialHeights.paradigmHeight + "px"
+    initialHeight + "px"
   );
 
   const trendItems = new vis.DataSet(data.trendItems);
