@@ -523,6 +523,22 @@
       overflow: visible;
     }
 
+    .export-secondary-time-grid {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    .export-secondary-time-grid-line {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 1px;
+      background-color: #e5e7eb;
+    }
+
     .timeline-stage.is-exporting-image .timeline-part-label.trends {
       flex-basis: calc(var(--trend-label-height, 108px) - 54px);
       height: calc(var(--trend-label-height, 108px) - 54px);
@@ -1212,11 +1228,15 @@
       white-space: nowrap;
     }
 
-    /* The paradigms timeline has no axis; energy uses a bottom axis and adjustments a top axis. */
-    .timeline-bottom-shell .vis-time-axis,
+    /* Paradigms keep the labeled axis hidden but retain its background grid. */
+    .timeline-bottom-shell .vis-time-axis.vis-foreground,
     .timeline-bottom-shell .vis-panel.vis-top,
     .timeline-bottom-shell .vis-panel.vis-bottom {
       display: none;
+    }
+
+    .timeline-bottom-shell .vis-time-axis.vis-background {
+      display: block;
     }
 
     .vis-panel.vis-left.vis-vertical-scroll {

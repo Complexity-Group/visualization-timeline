@@ -748,7 +748,7 @@ function buildTopOptions(baseOptions, timeAxisStep) {
   };
 }
 
-function buildBottomOptions(baseOptions) {
+function buildBottomOptions(baseOptions, timeAxisStep) {
   const bounds = buildBounds(baseOptions);
   const initialHeight = getInitialTimelineHeight();
   return {
@@ -769,12 +769,14 @@ function buildBottomOptions(baseOptions) {
       },
       axis: 0
     },
+    timeAxis: {
+      scale: "year",
+      step: timeAxisStep || 25
+    },
+    showMajorLabels: false,
+    showMinorLabels: true,
     showCurrentTime: false,
-    template: buildParadigmItemTemplate,
-    // timeAxis: {
-    //   scale: "year",
-    //   step: 1
-    // }
+    template: buildParadigmItemTemplate
   };
 }
 
@@ -1254,7 +1256,7 @@ function renderTimeline(data) {
     el.timelineBottom,
     paradigmItems,
     paradigmGroups,
-    buildBottomOptions(data.paradigmOptions)
+    buildBottomOptions(data.paradigmOptions, data.timeAxisStep)
   );
 
   adjustmentTimelineInstance = new vis.Timeline(
@@ -1644,6 +1646,64 @@ function setExportWidths(widths) {
   }
 }
 
+function addExportSecondaryTimelineGridLines(clonedDocument) {
+  const energyTimeline = clonedDocument.getElementById("timelineTop");
+  if (!energyTimeline) {
+    return;
+  }
+
+  const energyPanel = energyTimeline.querySelector(".vis-panel.vis-center");
+  if (!energyPanel) {
+    return;
+  }
+
+  const energyPanelBounds = energyPanel.getBoundingClientRect();
+  if (energyPanelBounds.width <= 0) {
+    return;
+  }
+
+  const linePositions = [];
+  const seenPositions = new Set();
+  const energyGridLines = energyTimeline.querySelectorAll(".vis-grid.vis-vertical");
+  for (let lineIndex = 0; lineIndex < energyGridLines.length; lineIndex += 1) {
+    const lineBounds = energyGridLines[lineIndex].getBoundingClientRect();
+    const ratio = (lineBounds.left - energyPanelBounds.left) / energyPanelBounds.width;
+    if (ratio < -0.001 || ratio > 1.001) {
+      continue;
+    }
+
+    const normalizedRatio = Math.min(Math.max(ratio, 0), 1);
+    const positionKey = normalizedRatio.toFixed(6);
+    if (!seenPositions.has(positionKey)) {
+      seenPositions.add(positionKey);
+      linePositions.push(normalizedRatio);
+    }
+  }
+
+  if (!linePositions.length) {
+    return;
+  }
+
+  ["timelineBottom", "timelineAdjustments"].forEach(function (timelineId) {
+    const timeline = clonedDocument.getElementById(timelineId);
+    const panel = timeline && timeline.querySelector(".vis-panel.vis-center");
+    if (!panel) {
+      return;
+    }
+
+    const gridLayer = clonedDocument.createElement("div");
+    gridLayer.className = "export-secondary-time-grid";
+    gridLayer.setAttribute("aria-hidden", "true");
+    for (let positionIndex = 0; positionIndex < linePositions.length; positionIndex += 1) {
+      const gridLine = clonedDocument.createElement("span");
+      gridLine.className = "export-secondary-time-grid-line";
+      gridLine.style.left = (linePositions[positionIndex] * 100) + "%";
+      gridLayer.appendChild(gridLine);
+    }
+    panel.appendChild(gridLayer);
+  });
+}
+
 function neutralizeExportBackgroundImages(clonedDocument) {
   if (!clonedDocument.head) {
     return;
@@ -1660,6 +1720,7 @@ function neutralizeExportBackgroundImages(clonedDocument) {
     "#timelineStage *::before, #timelineStage *::after { background-image: none !important; }"
   ].join("\n");
   clonedDocument.head.appendChild(exportSafetyStyle);
+  addExportSecondaryTimelineGridLines(clonedDocument);
 
   const clonedTrendTimeline = clonedDocument.getElementById("timelineTop");
   if (clonedTrendTimeline) {
