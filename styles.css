@@ -22,6 +22,8 @@
       --paradigm-export-border: #cfb99a;
       --paradigm-accent: #a67c2e;
       --paradigm-ink: #5c3f12;
+      --adjustment-accent: #5f8f72;
+      --adjustment-ink: #315340;
       --shadow-sm: 0 1px 2px rgba(26, 35, 50, 0.05);
       --shadow-md: 0 8px 28px rgba(26, 35, 50, 0.08);
       --header-h: auto;
@@ -480,6 +482,10 @@
       min-height: 0;
       display: flex;
       width: 100%;
+      overflow-y: auto;
+      overflow-x: hidden;
+      scrollbar-gutter: stable;
+      align-items: flex-start;
     }
 
     .timeline-label-rail {
@@ -497,6 +503,8 @@
       font-weight: 700;
       letter-spacing: 0.02em;
       text-align: center;
+      flex-shrink: 0;
+      height: var(--chart-content-height, 100%);
     }
 
     .timeline-stage.is-exporting-image .timeline-label-rail {
@@ -509,6 +517,15 @@
       font-size: 2rem;
       flex-basis: 54px;
       height: 54px;
+    }
+
+    .timeline-stage.is-exporting-image .timeline-chart-area {
+      overflow: visible;
+    }
+
+    .timeline-stage.is-exporting-image .timeline-part-label.trends {
+      flex-basis: calc(var(--trend-label-height, 108px) - 54px);
+      height: calc(var(--trend-label-height, 108px) - 54px);
     }
 
     .timeline-part-label {
@@ -525,8 +542,8 @@
     }
 
     .timeline-part-label.trends {
-      flex: 1 1 auto;
-      min-height: 0;
+      flex: 0 0 calc(var(--trend-label-height, 68px) - 34px);
+      height: calc(var(--trend-label-height, 68px) - 34px);
       background: var(--bg-elevated);
     }
 
@@ -543,12 +560,20 @@
       background: var(--bg-elevated);
     }
 
+    .timeline-part-label.adjustments {
+      flex: 0 0 var(--adjustment-label-height, 36px);
+      height: var(--adjustment-label-height, 36px);
+      background: var(--bg-elevated);
+    }
+
     .timeline-chart-content {
       flex: 1 1 auto;
       min-width: 0;
       min-height: 0;
       display: flex;
       flex-direction: column;
+      flex-shrink: 0;
+      height: var(--chart-content-height, auto);
     }
 
     .timeline-shell {
@@ -560,8 +585,7 @@
     }
 
     .timeline-top-shell {
-      flex: 1 1 0;
-      height: 50%;
+      flex: 0 0 auto;
       min-height: 0;
       border-bottom: 1px solid var(--border);
       display: flex;
@@ -569,8 +593,7 @@
     }
 
     .timeline-bottom-shell {
-      flex: 1 1 0;
-      height: 50%;
+      flex: 0 0 auto;
       min-height: 0;
       background:
         linear-gradient(180deg, rgba(166, 124, 46, 0.06), transparent 48px),
@@ -587,6 +610,18 @@
     }
 
     #timelineBottom {
+      width: 100%;
+    }
+
+    .timeline-adjustment-shell {
+      flex: 0 0 auto;
+      min-height: 0;
+      background: var(--bg-elevated);
+      border-top: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    #timelineAdjustments {
       width: 100%;
     }
 
@@ -989,6 +1024,114 @@
       z-index: 1;
     }
 
+    .vis-item.adjustment-range {
+      --trend-line: var(--adjustment-accent);
+      --trend-line-center-y: 18px;
+      color: var(--adjustment-ink);
+      font-family: var(--font-serif);
+      font-size: 0.82rem;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      line-height: 1.3;
+      min-height: 28px !important;
+      overflow: visible !important;
+      cursor: pointer;
+      background: linear-gradient(var(--trend-line), var(--trend-line)) no-repeat center calc(var(--trend-line-center-y) - 1.25px) / 100% 2.5px,
+                  transparent !important;
+      border: none !important;
+      transition: filter 0.15s ease, opacity 0.15s ease;
+    }
+
+    .vis-item.adjustment-range:hover {
+      filter: brightness(0.92) saturate(1.15);
+    }
+
+    .vis-item.adjustment-range .vis-item-content {
+      position: static !important;
+      display: block;
+      width: 100%;
+      min-height: 28px;
+      height: 28px;
+      padding: 4px 6px;
+      white-space: nowrap;
+      overflow: visible;
+      z-index: 2;
+    }
+
+    .vis-item.adjustment-range.dot-left::before,
+    .vis-item.adjustment-range.dot-right::after {
+      content: "";
+      position: absolute;
+      top: var(--trend-line-center-y);
+      transform: translateY(-50%);
+      width: 7px;
+      height: 7px;
+      box-sizing: content-box;
+      border: 1px solid #d1d5db;
+      border-radius: 50%;
+      background: var(--trend-line);
+      box-shadow: none;
+      z-index: 1;
+    }
+
+    .vis-item.adjustment-range.dot-left::before {
+      left: -5px;
+    }
+
+    .vis-item.adjustment-range.dot-right::after {
+      right: -5px;
+    }
+
+    .vis-item.adjustment-range.arrow-right::after {
+      content: "";
+      position: absolute;
+      right: -5px;
+      top: calc(var(--trend-line-center-y) - 5px);
+      width: 0;
+      height: 0;
+      border-top: 5px solid transparent;
+      border-bottom: 5px solid transparent;
+      border-left: 8px solid var(--trend-line);
+    }
+
+    .timeline-stage.is-exporting-image .vis-item.adjustment-range {
+      --trend-line-center-y: 36px;
+      min-height: 48px !important;
+      font-size: 1.8rem;
+      overflow: visible !important;
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none;
+    }
+
+    .timeline-stage.is-exporting-image .vis-item.adjustment-range .vis-item-content {
+      position: static !important;
+      display: block;
+      width: 100%;
+      min-height: 48px;
+      height: 48px;
+      padding: 0 20px;
+      background-color: transparent !important;
+      transform: none !important;
+    }
+
+    .timeline-stage.is-exporting-image .vis-item.adjustment-range.dot-left::before,
+    .timeline-stage.is-exporting-image .vis-item.adjustment-range.dot-right::after,
+    .timeline-stage.is-exporting-image .vis-item.adjustment-range.arrow-right::after {
+      display: none !important;
+    }
+
+    .timeline-stage.is-exporting-image .timeline-adjustment-shell,
+    .timeline-stage.is-exporting-image #timelineAdjustments,
+    .timeline-stage.is-exporting-image #timelineAdjustments .vis-timeline,
+    .timeline-stage.is-exporting-image #timelineAdjustments .vis-panel,
+    .timeline-stage.is-exporting-image #timelineAdjustments .vis-content,
+    .timeline-stage.is-exporting-image #timelineAdjustments .vis-itemset,
+    .timeline-stage.is-exporting-image #timelineAdjustments .vis-group {
+      background-color: var(--bg-elevated) !important;
+      background-image: none !important;
+    }
+
     .timeline-stage.is-exporting-image.is-mobile-export .vis-item.trend-range.dot-left::before,
     .timeline-stage.is-exporting-image.is-mobile-export .vis-item.trend-range.dot-right::after,
     .timeline-stage.is-exporting-image.is-mobile-export .vis-item.paradigm-range.dot-left::before,
@@ -1029,7 +1172,10 @@
     /* Bottom timeline only displays paradigm ranges; axis stays on top timeline. */
     .timeline-bottom-shell .vis-time-axis,
     .timeline-bottom-shell .vis-panel.vis-top,
-    .timeline-bottom-shell .vis-panel.vis-bottom {
+    .timeline-bottom-shell .vis-panel.vis-bottom,
+    .timeline-adjustment-shell .vis-time-axis,
+    .timeline-adjustment-shell .vis-panel.vis-top,
+    .timeline-adjustment-shell .vis-panel.vis-bottom {
       display: none;
     }
 
@@ -1374,7 +1520,9 @@
       }
 
       .timeline-bottom-shell,
-      #timelineBottom {
+      #timelineBottom,
+      .timeline-adjustment-shell,
+      #timelineAdjustments {
         min-height: 0;
       }
 

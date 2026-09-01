@@ -3,25 +3,32 @@ import { normalizeParadigmKey, parseWorkbookData } from "./workbook.js";
 
 const DEFAULT_GROUP_ID = "default";
 const PARADIGM_GROUP_ID = "paradigms";
+const ADJUSTMENT_GROUP_ID = "adjustments";
 const ONGOING_ENDPOINT_YEAR = 2025;
 const TREND_ROW_HEIGHT = 34;
 const TREND_TIME_AXIS_HEIGHT = 34;
+const SECONDARY_ROW_HEIGHT = 36;
 const EXPORT_TREND_ROW_HEIGHT = 52;
 const EXPORT_TIME_AXIS_HEIGHT = 54;
 
 let trendTimelineInstance = null;
 let paradigmTimelineInstance = null;
+let adjustmentTimelineInstance = null;
 let activeTabKey = null;
 let loadGeneration = 0;
 const tabCache = {};
 let currentTrendItems = [];
 let currentParadigmItems = [];
+let currentAdjustmentItems = [];
 let trendItemsById = new Map();
 let paradigmItemsById = new Map();
+let adjustmentItemsById = new Map();
 let eventsByTrendSubgroup = new Map();
 let eventsByParadigm = new Map();
+let eventsByAdjustment = new Map();
 let currentTrendOptions = null;
 let currentParadigmOptions = null;
+let currentAdjustmentOptions = null;
 let pendingInitialWindow = null;
 let isExportingImage = false;
 let activeExportWindow = null;
@@ -30,8 +37,10 @@ const el = {
   widgetRoot: document.getElementById("widgetRoot"),
   timelineTop: document.getElementById("timelineTop"),
   timelineBottom: document.getElementById("timelineBottom"),
+  timelineAdjustments: document.getElementById("timelineAdjustments"),
   timelineShell: document.getElementById("timelineShell"),
   paradigmShell: document.getElementById("paradigmShell"),
+  adjustmentShell: document.getElementById("adjustmentShell"),
   timelineStage: document.getElementById("timelineStage"),
   timelineTitle: document.getElementById("timelineTitle"),
   timelineChartArea: document.getElementById("timelineChartArea"),
@@ -310,9 +319,12 @@ function buildTimelineData(workbookData, config) {
     trendSubgroups: new Set(),
     trendItems: [],
     paradigmSubgroups: new Set(),
-    paradigmItems: []
+    paradigmItems: [],
+    adjustmentSubgroups: new Set(),
+    adjustmentItems: []
   };
   const paradigms = new Map();
+  const adjustments = new Map();
   let trendCounter = 1;
   let eventCounter = 1;
   let eventRowCount = 0;
@@ -368,24 +380,39 @@ function buildTimelineData(workbookData, config) {
         startIsBce: startInfo.isBce,
         title: event.event,
         paradigm: event.paradigm,
+        adjustment: event.adjustment,
         energySource: sheetName
       });
       eventRowCount += 1;
 
       const paradigmKey = normalizeParadigmKey(event.paradigm);
-      if (!paradigmKey) {
-        continue;
+      if (paradigmKey) {
+        const existing = paradigms.get(paradigmKey);
+        if (existing) {
+          existing.minYear = Math.min(existing.minYear, event.startYear);
+          existing.maxYear = Math.max(existing.maxYear, event.startYear);
+        } else {
+          paradigms.set(paradigmKey, {
+            title: event.paradigm,
+            minYear: event.startYear,
+            maxYear: event.startYear
+          });
+        }
       }
-      const existing = paradigms.get(paradigmKey);
-      if (existing) {
-        existing.minYear = Math.min(existing.minYear, event.startYear);
-        existing.maxYear = Math.max(existing.maxYear, event.startYear);
-      } else {
-        paradigms.set(paradigmKey, {
-          title: event.paradigm,
-          minYear: event.startYear,
-          maxYear: event.startYear
-        });
+
+      const adjustmentKey = normalizeParadigmKey(event.adjustment);
+      if (adjustmentKey) {
+        const existingAdjustment = adjustments.get(adjustmentKey);
+        if (existingAdjustment) {
+          existingAdjustment.minYear = Math.min(existingAdjustment.minYear, event.startYear);
+          existingAdjustment.maxYear = Math.max(existingAdjustment.maxYear, event.startYear);
+        } else {
+          adjustments.set(adjustmentKey, {
+            title: event.adjustment,
+            minYear: event.startYear,
+            maxYear: event.startYear
+          });
+        }
       }
     }
   });
@@ -416,6 +443,32 @@ function buildTimelineData(workbookData, config) {
     });
   });
 
+  let adjustmentCounter = 1;
+  adjustments.forEach(function (adjustment, adjustmentKey) {
+    const startInfo = yearDateInfo(adjustment.minYear);
+    const endInfo = yearDateInfo(adjustment.maxYear);
+    timeline.adjustmentSubgroups.add(adjustmentKey);
+    timeline.adjustmentItems.push({
+      id: "adjustment-" + adjustmentCounter++,
+      group: ADJUSTMENT_GROUP_ID,
+      subgroup: adjustmentKey,
+      type: "range",
+      className: "adjustment-range"
+        + (adjustment.minYear === workbookData.timeline.startYear ? "" : " dot-left")
+        + (adjustment.maxYear < ONGOING_ENDPOINT_YEAR ? " dot-right" : " arrow-right"),
+      start: startInfo.date,
+      end: endInfo.date,
+      startYear: adjustment.minYear,
+      startRaw: startInfo.raw,
+      endRaw: endInfo.raw,
+      startIsBce: startInfo.isBce,
+      endIsBce: endInfo.isBce,
+      titleText: adjustment.title,
+      displayText: adjustment.title + " (" + startInfo.raw + "-" + endInfo.raw + ")",
+      content: escapeHtml(adjustment.title) + " (" + escapeHtml(startInfo.raw) + "-" + escapeHtml(endInfo.raw) + ")"
+    });
+  });
+
   const span = timelineEnd.getTime() - timelineStart.getTime();
   const bufferFactor = window.innerWidth <= 768 ? 0.02 : 0.01;
   const endWithBuffer = new Date(timelineEnd.getTime() + span * bufferFactor);
@@ -427,6 +480,10 @@ function buildTimelineData(workbookData, config) {
   const orderedParadigmSubgroups = orderSubgroupsByStartDate(
     timeline.paradigmSubgroups,
     timeline.paradigmItems
+  );
+  const orderedAdjustmentSubgroups = orderSubgroupsByStartDate(
+    timeline.adjustmentSubgroups,
+    timeline.adjustmentItems
   );
 
   return {
@@ -443,8 +500,14 @@ function buildTimelineData(workbookData, config) {
       orderedParadigmSubgroups,
       compareSubgroupsByStartDate
     )],
+    adjustmentGroups: [createGroupWithSubgroups(
+      ADJUSTMENT_GROUP_ID,
+      orderedAdjustmentSubgroups,
+      compareSubgroupsByStartDate
+    )],
     trendItems: timeline.trendItems,
     paradigmItems: timeline.paradigmItems,
+    adjustmentItems: timeline.adjustmentItems,
     trendOptions: {
       stack: false,
       stackSubgroups: true,
@@ -456,7 +519,15 @@ function buildTimelineData(workbookData, config) {
       stack: false,
       stackSubgroups: true,
       start: timelineStart,
-      end: timelineEnd
+      end: timelineEnd,
+      height: Math.max(timeline.paradigmSubgroups.size * SECONDARY_ROW_HEIGHT, SECONDARY_ROW_HEIGHT)
+    },
+    adjustmentOptions: {
+      stack: false,
+      stackSubgroups: true,
+      start: timelineStart,
+      end: timelineEnd,
+      height: Math.max(timeline.adjustmentSubgroups.size * SECONDARY_ROW_HEIGHT, SECONDARY_ROW_HEIGHT)
     },
     timeAxisStep: workbookData.timeline.increment,
     eventRowCount
@@ -500,30 +571,31 @@ function getAvailableTimelineHeight() {
 }
 
 function calculateTimelineHeights(trendOptions) {
-  const availableHeight = getAvailableTimelineHeight();
   const requiredTrendHeight = Math.max(
     Math.round(trendOptions && trendOptions.height
       ? trendOptions.height
       : TREND_ROW_HEIGHT + TREND_TIME_AXIS_HEIGHT),
     TREND_ROW_HEIGHT
   );
-
-  if (requiredTrendHeight * 1.5 > availableHeight) {
-    const equalHeight = Math.floor(availableHeight / 2);
-    return {
-      trendHeight: equalHeight,
-      paradigmHeight: equalHeight
-    };
-  }
-
   return {
     trendHeight: requiredTrendHeight,
-    paradigmHeight: availableHeight - requiredTrendHeight
+    paradigmHeight: Math.max(
+      Math.round(currentParadigmOptions && currentParadigmOptions.height
+        ? currentParadigmOptions.height
+        : SECONDARY_ROW_HEIGHT),
+      SECONDARY_ROW_HEIGHT
+    ),
+    adjustmentHeight: Math.max(
+      Math.round(currentAdjustmentOptions && currentAdjustmentOptions.height
+        ? currentAdjustmentOptions.height
+        : SECONDARY_ROW_HEIGHT),
+      SECONDARY_ROW_HEIGHT
+    )
   };
 }
 
 function getInitialTimelineHeight() {
-  return Math.max(Math.floor(getAvailableTimelineHeight() / 2), 1);
+  return Math.max(Math.floor(getAvailableTimelineHeight() / 3), 1);
 }
 
 function applyTimelineShellHeights(heights) {
@@ -531,6 +603,13 @@ function applyTimelineShellHeights(heights) {
   el.timelineShell.style.height = heights.trendHeight + "px";
   el.paradigmShell.style.flex = "0 0 " + heights.paradigmHeight + "px";
   el.paradigmShell.style.height = heights.paradigmHeight + "px";
+  el.adjustmentShell.style.flex = "0 0 " + heights.adjustmentHeight + "px";
+  el.adjustmentShell.style.height = heights.adjustmentHeight + "px";
+  const chartContentHeight = heights.trendHeight + heights.paradigmHeight + heights.adjustmentHeight;
+  el.timelineChartArea.style.setProperty("--chart-content-height", chartContentHeight + "px");
+  el.timelineLabelRail.style.setProperty("--trend-label-height", heights.trendHeight + "px");
+  el.timelineLabelRail.style.setProperty("--paradigm-label-height", heights.paradigmHeight + "px");
+  el.timelineLabelRail.style.setProperty("--adjustment-label-height", heights.adjustmentHeight + "px");
 }
 
 function resetTimelineShellHeights() {
@@ -538,6 +617,9 @@ function resetTimelineShellHeights() {
   el.timelineShell.style.removeProperty("height");
   el.paradigmShell.style.removeProperty("flex");
   el.paradigmShell.style.removeProperty("height");
+  el.adjustmentShell.style.removeProperty("flex");
+  el.adjustmentShell.style.removeProperty("height");
+  el.timelineChartArea.style.removeProperty("--chart-content-height");
 }
 
 function buildTrendItemTemplate(item) {
@@ -603,7 +685,7 @@ function buildTopOptions(baseOptions, timeAxisStep) {
       axis: "bottom",
       item: "top"
     },
-    verticalScroll: true,
+    verticalScroll: false,
     zoomKey: "ctrlKey",
     margin: {
       item: {
@@ -616,7 +698,7 @@ function buildTopOptions(baseOptions, timeAxisStep) {
       scale: "year",
       step: timeAxisStep || 25
     },
-    groupHeightMode: "fixed",
+    groupHeightMode: "fitItems",
     showCurrentTime: false,
     template: buildTrendItemTemplate,
     onInitialDrawComplete: scheduleInitialTopTimelineScroll,
@@ -631,12 +713,12 @@ function buildBottomOptions(baseOptions) {
     ...bounds,
     height: initialHeight + "px",
     orientation: "top",
-    verticalScroll: true,
+    verticalScroll: false,
     zoomable: true,
     zoomKey: "ctrlKey",
     moveable: true,
     selectable: true,
-    groupHeightMode: "fixed",
+    groupHeightMode: "fitItems",
     margin: {
       item: {
         horizontal: 0,
@@ -656,14 +738,14 @@ function buildBottomOptions(baseOptions) {
 let lastAppliedTimelineHeights = null;
 
 function applyTimelineHeights() {
-  // Export temporarily expands both timelines to their complete content
+  // Export temporarily expands all timelines to their complete content
   // heights. A ResizeObserver fires during that expansion, so responsive
   // sizing must not overwrite the export-only dimensions.
-  if (isExportingImage || !trendTimelineInstance || !paradigmTimelineInstance) {
+  if (isExportingImage || !trendTimelineInstance || !paradigmTimelineInstance || !adjustmentTimelineInstance) {
     return false;
   }
   const heights = calculateTimelineHeights(currentTrendOptions);
-  const heightKey = heights.trendHeight + ":" + heights.paradigmHeight;
+  const heightKey = heights.trendHeight + ":" + heights.paradigmHeight + ":" + heights.adjustmentHeight;
   if (lastAppliedTimelineHeights === heightKey) {
     return false;
   }
@@ -671,45 +753,50 @@ function applyTimelineHeights() {
   applyTimelineShellHeights(heights);
   trendTimelineInstance.setOptions({ height: heights.trendHeight + "px" });
   paradigmTimelineInstance.setOptions({ height: heights.paradigmHeight + "px" });
-  el.timelineLabelRail.style.setProperty("--paradigm-label-height", heights.paradigmHeight + "px");
+  adjustmentTimelineInstance.setOptions({ height: heights.adjustmentHeight + "px" });
   return true;
 }
 
-function syncTimelineWindowsBidirectional(first, second) {
+function syncTimelineWindows(instances) {
   let isSyncing = false;
 
-  function wire(source, target) {
+  function wire(source) {
     source.on("rangechange", (props) => {
       if (isSyncing || isExportingImage) {
         return;
       }
 
       isSyncing = true;
-      target.setWindow(props.start, props.end, { animation: false });
+      instances.forEach(function (target) {
+        if (target !== source) {
+          target.setWindow(props.start, props.end, { animation: false });
+        }
+      });
       isSyncing = false;
     });
   }
 
-  wire(first, second);
-  wire(second, first);
+  instances.forEach(wire);
  }
 
 function refreshVisibleTimelines() {
-  if (isExportingImage || !trendTimelineInstance || !paradigmTimelineInstance) {
+  if (isExportingImage || !trendTimelineInstance || !paradigmTimelineInstance || !adjustmentTimelineInstance) {
     return;
   }
 
   // Timelines are created while containers are hidden; redraw once visible so axis/layout paints correctly.
   requestAnimationFrame(() => {
-    // First paint both timelines using the equal heights they were initialized
-    // with. Adaptive sizing is applied only after vis has a valid visible DOM.
+    // First paint all timelines, then apply their full content heights after
+    // vis has a valid visible DOM.
     trendTimelineInstance.redraw();
     paradigmTimelineInstance.redraw();
+    adjustmentTimelineInstance.redraw();
 
     requestAnimationFrame(() => {
       applyTimelineHeights();
       trendTimelineInstance.redraw();
       paradigmTimelineInstance.redraw();
+      adjustmentTimelineInstance.redraw();
 
       if (pendingInitialWindow) {
         trendTimelineInstance.setWindow(pendingInitialWindow.start, pendingInitialWindow.end, { animation: false });
@@ -720,6 +807,7 @@ function refreshVisibleTimelines() {
 
       const topWindow = trendTimelineInstance.getWindow();
       paradigmTimelineInstance.setWindow(topWindow.start, topWindow.end, { animation: false });
+      adjustmentTimelineInstance.setWindow(topWindow.start, topWindow.end, { animation: false });
       scheduleInitialTopTimelineScroll();
     });
   });
@@ -766,7 +854,8 @@ function anchorTrendEndpointYears() {
 function unwrapDefaultTimelineRangeContent() {
   const rangeCollections = [
     [el.timelineTop, ".vis-item.trend-range"],
-    [el.timelineBottom, ".vis-item.paradigm-range"]
+    [el.timelineBottom, ".vis-item.paradigm-range"],
+    [el.timelineAdjustments, ".vis-item.adjustment-range"]
   ];
 
   for (let collectionIndex = 0; collectionIndex < rangeCollections.length; collectionIndex += 1) {
@@ -820,15 +909,24 @@ function positionDefaultTimelineRangeTitles() {
     }
   }
 
-  const paradigmPanel = el.timelineBottom.querySelector(".vis-panel.vis-center");
-  const paradigmRanges = el.timelineBottom.querySelectorAll(".vis-item.paradigm-range");
-  if (paradigmPanel) {
-    const panelBounds = paradigmPanel.getBoundingClientRect();
+  const secondaryCollections = [
+    [el.timelineBottom, ".vis-item.paradigm-range"],
+    [el.timelineAdjustments, ".vis-item.adjustment-range"]
+  ];
+  for (let collectionIndex = 0; collectionIndex < secondaryCollections.length; collectionIndex += 1) {
+    const root = secondaryCollections[collectionIndex][0];
+    const selector = secondaryCollections[collectionIndex][1];
+    const panel = root.querySelector(".vis-panel.vis-center");
+    const ranges = root.querySelectorAll(selector);
+    if (!panel) {
+      continue;
+    }
+    const panelBounds = panel.getBoundingClientRect();
     const panelLeft = panelBounds.left + 8;
     const panelRight = panelBounds.right - 8;
 
-    for (let i = 0; i < paradigmRanges.length; i += 1) {
-      const range = paradigmRanges[i];
+    for (let i = 0; i < ranges.length; i += 1) {
+      const range = ranges[i];
       const title = range.querySelector(".paradigm-title-text");
       if (!title) {
         continue;
@@ -868,27 +966,37 @@ function scheduleTrendEndpointAnchoring() {
 }
 
 function scrollTopTimelineToFirstRow() {
-  if (!trendTimelineInstance) {
+  scrollTimelineToFirstRow(trendTimelineInstance, el.timelineTop);
+}
+
+function scrollTimelineToFirstRow(timelineInstance, timelineRoot) {
+  if (!timelineInstance || !timelineRoot) {
     return;
   }
 
   // vis-timeline stores vertical position as an internal negative offset;
   // the center panel itself is not a native scrolling element.
-  if (typeof trendTimelineInstance._setScrollTop === "function") {
-    trendTimelineInstance._setScrollTop(0);
-    trendTimelineInstance.redraw();
+  if (typeof timelineInstance._setScrollTop === "function") {
+    timelineInstance._setScrollTop(0);
+    timelineInstance.redraw();
     return;
   }
 
-  const sideScrollPanel = el.timelineTop.querySelector(".vis-panel.vis-left.vis-vertical-scroll");
+  const sideScrollPanel = timelineRoot.querySelector(".vis-panel.vis-left.vis-vertical-scroll");
   if (sideScrollPanel) {
     sideScrollPanel.scrollTop = 0;
   }
 }
 
-function measureTrendExportHeightDeficit() {
-  const itemPanel = el.timelineTop.querySelector(".vis-panel.vis-center");
-  const ranges = el.timelineTop.querySelectorAll(".vis-item.trend-range");
+function scrollAllTimelinesToFirstRow() {
+  scrollTimelineToFirstRow(trendTimelineInstance, el.timelineTop);
+  scrollTimelineToFirstRow(paradigmTimelineInstance, el.timelineBottom);
+  scrollTimelineToFirstRow(adjustmentTimelineInstance, el.timelineAdjustments);
+}
+
+function measureTimelineExportHeightDeficit(root, rangeSelector) {
+  const itemPanel = root.querySelector(".vis-panel.vis-center");
+  const ranges = root.querySelectorAll(rangeSelector);
   if (!itemPanel || !ranges.length) {
     return 0;
   }
@@ -903,17 +1011,23 @@ function measureTrendExportHeightDeficit() {
   return Math.max(Math.ceil(lastRangeBottom - panelBounds.bottom + 4), 0);
 }
 
+function measureTrendExportHeightDeficit() {
+  return measureTimelineExportHeightDeficit(el.timelineTop, ".vis-item.trend-range");
+}
+
 function scheduleInitialTopTimelineScroll() {
   requestAnimationFrame(function () {
-    requestAnimationFrame(scrollTopTimelineToFirstRow);
+    requestAnimationFrame(scrollAllTimelinesToFirstRow);
   });
 }
 
-function indexTimelineItems(trendItems, paradigmItems) {
+function indexTimelineItems(trendItems, paradigmItems, adjustmentItems) {
   trendItemsById = new Map(trendItems.map((item) => [item.id, item]));
   paradigmItemsById = new Map(paradigmItems.map((item) => [item.id, item]));
+  adjustmentItemsById = new Map(adjustmentItems.map((item) => [item.id, item]));
   eventsByTrendSubgroup = new Map();
   eventsByParadigm = new Map();
+  eventsByAdjustment = new Map();
 
   for (const item of trendItems) {
     if (item.type !== "point") {
@@ -926,42 +1040,57 @@ function indexTimelineItems(trendItems, paradigmItems) {
     eventsByTrendSubgroup.get(item.subgroup).push(item);
 
     const paradigmKey = normalizeParadigmKey(item.paradigm);
-    if (!paradigmKey) {
-      continue;
+    if (paradigmKey) {
+      if (!eventsByParadigm.has(paradigmKey)) {
+        eventsByParadigm.set(paradigmKey, []);
+      }
+      eventsByParadigm.get(paradigmKey).push(item);
     }
-    if (!eventsByParadigm.has(paradigmKey)) {
-      eventsByParadigm.set(paradigmKey, []);
+
+    const adjustmentKey = normalizeParadigmKey(item.adjustment);
+    if (adjustmentKey) {
+      if (!eventsByAdjustment.has(adjustmentKey)) {
+        eventsByAdjustment.set(adjustmentKey, []);
+      }
+      eventsByAdjustment.get(adjustmentKey).push(item);
     }
-    eventsByParadigm.get(paradigmKey).push(item);
   }
 }
 
 function renderTimeline(data) {
   currentTrendItems = data.trendItems;
   currentParadigmItems = data.paradigmItems;
-  indexTimelineItems(currentTrendItems, currentParadigmItems);
+  currentAdjustmentItems = data.adjustmentItems;
+  indexTimelineItems(currentTrendItems, currentParadigmItems, currentAdjustmentItems);
   currentTrendOptions = data.trendOptions;
   currentParadigmOptions = data.paradigmOptions;
+  currentAdjustmentOptions = data.adjustmentOptions;
   lastAppliedTimelineHeights = null;
   el.timelineTitle.textContent = data.title;
   el.trendSectionLabel.textContent = TIMELINE_CONFIGS[activeTabKey].label;
   resetTimelineShellHeights();
   const initialHeight = getInitialTimelineHeight();
-  el.timelineLabelRail.style.setProperty(
-    "--paradigm-label-height",
-    initialHeight + "px"
-  );
+  applyTimelineShellHeights({
+    trendHeight: initialHeight,
+    paradigmHeight: initialHeight,
+    adjustmentHeight: initialHeight
+  });
 
   const trendItems = new vis.DataSet(data.trendItems);
   const trendGroups = new vis.DataSet(data.trendGroups);
   const paradigmItems = new vis.DataSet(data.paradigmItems);
   const paradigmGroups = new vis.DataSet(data.paradigmGroups);
+  const adjustmentItems = new vis.DataSet(data.adjustmentItems);
+  const adjustmentGroups = new vis.DataSet(data.adjustmentGroups);
 
   if (trendTimelineInstance) {
     trendTimelineInstance.destroy();
   }
   if (paradigmTimelineInstance) {
     paradigmTimelineInstance.destroy();
+  }
+  if (adjustmentTimelineInstance) {
+    adjustmentTimelineInstance.destroy();
   }
 
   try {
@@ -988,15 +1117,26 @@ function renderTimeline(data) {
     buildBottomOptions(data.paradigmOptions)
   );
 
-  syncTimelineWindowsBidirectional(trendTimelineInstance, paradigmTimelineInstance);
+  adjustmentTimelineInstance = new vis.Timeline(
+    el.timelineAdjustments,
+    adjustmentItems,
+    adjustmentGroups,
+    buildBottomOptions(data.adjustmentOptions)
+  );
+
+  syncTimelineWindows([trendTimelineInstance, paradigmTimelineInstance, adjustmentTimelineInstance]);
 
   paradigmTimelineInstance.on("changed", scheduleDefaultTimelineRangeTitleLayout);
   paradigmTimelineInstance.on("rangechanged", scheduleDefaultTimelineRangeTitleLayout);
+  adjustmentTimelineInstance.on("changed", scheduleDefaultTimelineRangeTitleLayout);
+  adjustmentTimelineInstance.on("rangechanged", scheduleDefaultTimelineRangeTitleLayout);
 
   attachParadigmClickHandler(paradigmTimelineInstance);
+  attachAdjustmentClickHandler(adjustmentTimelineInstance);
 
   // Keep the initial viewport aligned after creation.
   paradigmTimelineInstance.setWindow(data.trendOptions.start, data.trendOptions.end, { animation: false });
+  adjustmentTimelineInstance.setWindow(data.trendOptions.start, data.trendOptions.end, { animation: false });
   scheduleDefaultTimelineRangeTitleLayout();
 }
 
@@ -1077,6 +1217,9 @@ function showEventsModal(title, events, emptyMessage) {
       const paradigmHtml = evt.paradigm
         ? '<span class="event-card-badge" style="' + badgeColors(evt.paradigm) + '">' + escapeHtml(evt.paradigm) + '</span>'
         : '';
+      const adjustmentHtml = evt.adjustment
+        ? '<span class="event-card-badge" style="' + badgeColors(evt.adjustment) + '">' + escapeHtml(evt.adjustment) + '</span>'
+        : '';
       const energySourceHtml = evt.energySource
         ? '<span class="event-card-badge" style="' + badgeColors(evt.energySource) + '">' + escapeHtml(evt.energySource) + '</span>'
         : '';
@@ -1085,6 +1228,7 @@ function showEventsModal(title, events, emptyMessage) {
         '<div class="event-card-header">' +
         '<span class="event-card-date">' + escapeHtml(displayStart(evt)) + '</span>' +
         paradigmHtml +
+        adjustmentHtml +
         energySourceHtml +
         '</div>' +
         '<div class="event-card-body">' + escapeHtml(evt.title || evt.content || "") + '</div>' +
@@ -1108,6 +1252,12 @@ function showParadigmModal(paradigmTitle) {
   const paradigmKey = normalizeParadigmKey(paradigmTitle);
   const events = eventsByParadigm.get(paradigmKey) || [];
   showEventsModal(paradigmTitle, events, "No events recorded for this paradigm.");
+}
+
+function showAdjustmentModal(adjustmentTitle) {
+  const adjustmentKey = normalizeParadigmKey(adjustmentTitle);
+  const events = eventsByAdjustment.get(adjustmentKey) || [];
+  showEventsModal(adjustmentTitle, events, "No events recorded for this adjustment.");
 }
 
 function hideModal() {
@@ -1164,6 +1314,19 @@ function attachParadigmClickHandler(timelineInstance) {
 
     if (clickedItem) {
       showParadigmModal(clickedItem.titleText || clickedItem.content);
+    }
+  });
+}
+
+function attachAdjustmentClickHandler(timelineInstance) {
+  timelineInstance.on("click", function (props) {
+    if (!props.item) {
+      return;
+    }
+
+    const clickedItem = adjustmentItemsById.get(props.item);
+    if (clickedItem) {
+      showAdjustmentModal(clickedItem.titleText || clickedItem.content);
     }
   });
 }
@@ -1315,8 +1478,10 @@ function clearExportLayoutStyles() {
   removeInlineStyleProperties(el.timelineChartArea, ["flex", "width", "height"]);
   removeInlineStyleProperties(el.timelineShell, ["flex", "width", "height"]);
   removeInlineStyleProperties(el.paradigmShell, ["flex", "width", "height"]);
+  removeInlineStyleProperties(el.adjustmentShell, ["flex", "width", "height"]);
   removeInlineStyleProperties(el.timelineTop, ["width"]);
   removeInlineStyleProperties(el.timelineBottom, ["width"]);
+  removeInlineStyleProperties(el.timelineAdjustments, ["width"]);
   removeInlineStyleProperties(el.exportLoadingOverlay, [
     "position", "top", "left", "width", "height"
   ]);
@@ -1328,8 +1493,10 @@ function setExportWidths(widths) {
     chartArea: el.timelineChartArea,
     timelineShell: el.timelineShell,
     paradigmShell: el.paradigmShell,
+    adjustmentShell: el.adjustmentShell,
     timelineTop: el.timelineTop,
-    timelineBottom: el.timelineBottom
+    timelineBottom: el.timelineBottom,
+    timelineAdjustments: el.timelineAdjustments
   };
 
   for (const [key, element] of Object.entries(widthTargets)) {
@@ -1384,21 +1551,27 @@ function neutralizeExportBackgroundImages(clonedDocument) {
     }
   }
 
-  const clonedTimeline = clonedDocument.getElementById("timelineBottom");
+  const secondaryTimelineDescriptors = [
+    { id: "timelineBottom", selector: ".vis-item.paradigm-range", options: currentParadigmOptions },
+    { id: "timelineAdjustments", selector: ".vis-item.adjustment-range", options: currentAdjustmentOptions }
+  ];
+  for (let timelineIndex = 0; timelineIndex < secondaryTimelineDescriptors.length; timelineIndex += 1) {
+  const descriptor = secondaryTimelineDescriptors[timelineIndex];
+  const clonedTimeline = clonedDocument.getElementById(descriptor.id);
   if (!clonedTimeline) {
-    return;
+    continue;
   }
 
   const itemPanel = clonedTimeline.querySelector(".vis-panel.vis-center") || clonedTimeline;
   const panelBounds = itemPanel.getBoundingClientRect();
   const exportWindowStartMs = new Date(
-    activeExportWindow ? activeExportWindow.start : currentParadigmOptions.start
+    activeExportWindow ? activeExportWindow.start : descriptor.options.start
   ).getTime();
   const exportWindowEndMs = new Date(
-    activeExportWindow ? activeExportWindow.end : currentParadigmOptions.end
+    activeExportWindow ? activeExportWindow.end : descriptor.options.end
   ).getTime();
   const exportWindowSpanMs = Math.max(exportWindowEndMs - exportWindowStartMs, 1);
-  const paradigmRangeCandidates = Array.from(clonedTimeline.querySelectorAll(".vis-item.paradigm-range"));
+  const paradigmRangeCandidates = Array.from(clonedTimeline.querySelectorAll(descriptor.selector));
   const paradigmRanges = [];
   const seenParadigmItemIds = new Set();
   for (let candidateIndex = 0; candidateIndex < paradigmRangeCandidates.length; candidateIndex += 1) {
@@ -1516,12 +1689,14 @@ function neutralizeExportBackgroundImages(clonedDocument) {
     content.style.setProperty("left", (labelLeft - rangeBounds.left) + "px", "important");
     content.style.setProperty("top", labelTop + "px", "important");
   }
+  }
 }
 
 async function exportTimelineAsJpeg() {
   const buttons = getExportButtons();
   const originalLabels = buttons.map(function (btn) { return btn.textContent; });
   let exportSucceeded = false;
+  const originalChartScrollTop = el.timelineChartArea.scrollTop;
   forEachButton(buttons, function (btn) {
     btn.disabled = true;
     setButtonText(btn, "Exporting…");
@@ -1531,7 +1706,8 @@ async function exportTimelineAsJpeg() {
   try {
     await nextAnimationFrame();
 
-    if (!trendTimelineInstance || !paradigmTimelineInstance || !currentTrendOptions || !currentParadigmOptions) {
+    if (!trendTimelineInstance || !paradigmTimelineInstance || !adjustmentTimelineInstance ||
+        !currentTrendOptions || !currentParadigmOptions || !currentAdjustmentOptions) {
       throw new Error("Timeline is not ready to export.");
     }
 
@@ -1545,8 +1721,10 @@ async function exportTimelineAsJpeg() {
       chartArea: targetExportWidth,
       timelineShell: exportTimelineWidth,
       paradigmShell: exportTimelineWidth,
+      adjustmentShell: exportTimelineWidth,
       timelineTop: exportTimelineWidth,
-      timelineBottom: exportTimelineWidth
+      timelineBottom: exportTimelineWidth,
+      timelineAdjustments: exportTimelineWidth
     };
     el.exportLoadingOverlay.style.position = "fixed";
     el.exportLoadingOverlay.style.top = originalStageRect.top + "px";
@@ -1569,11 +1747,18 @@ async function exportTimelineAsJpeg() {
     const paradigmRangeCount = currentParadigmItems.filter(function (item) {
       return item.type === "range";
     }).length;
-    const fullParadigmHeight = Math.max(paradigmRangeCount * 52, 76);
-    let fullChartHeight = fullTrendHeight + fullParadigmHeight;
+    let fullParadigmHeight = Math.max(paradigmRangeCount * 52, 76);
+    const adjustmentRangeCount = currentAdjustmentItems.filter(function (item) {
+      return item.type === "range";
+    }).length;
+    let fullAdjustmentHeight = Math.max(adjustmentRangeCount * 52, 76);
+    let fullChartHeight = fullTrendHeight + fullParadigmHeight + fullAdjustmentHeight;
     const titleHeight = Math.ceil(el.timelineTitle.getBoundingClientRect().height);
 
     el.timelineLabelRail.style.setProperty("--paradigm-label-height", fullParadigmHeight + "px");
+    el.timelineLabelRail.style.setProperty("--trend-label-height", fullTrendHeight + "px");
+    el.timelineLabelRail.style.setProperty("--adjustment-label-height", fullAdjustmentHeight + "px");
+    el.timelineChartArea.style.setProperty("--chart-content-height", fullChartHeight + "px");
 
     el.timelineStage.style.flex = "0 0 auto";
     setExportWidths(exportWidths);
@@ -1582,12 +1767,15 @@ async function exportTimelineAsJpeg() {
     el.timelineStage.style.minHeight = "0";
     el.timelineStage.style.paddingBottom = "0";
     el.timelineStage.style.overflow = "visible";
+    el.timelineChartArea.scrollTop = 0;
     el.timelineChartArea.style.flex = "0 0 auto";
     el.timelineChartArea.style.height = fullChartHeight + "px";
     el.timelineShell.style.flex = "0 0 auto";
     el.timelineShell.style.height = fullTrendHeight + "px";
     el.paradigmShell.style.flex = "0 0 auto";
     el.paradigmShell.style.height = fullParadigmHeight + "px";
+    el.adjustmentShell.style.flex = "0 0 auto";
+    el.adjustmentShell.style.height = fullAdjustmentHeight + "px";
 
     const exportStart = new Date(currentParadigmOptions.start);
     const exactExportEnd = new Date(currentParadigmOptions.end);
@@ -1609,6 +1797,13 @@ async function exportTimelineAsJpeg() {
       min: exportStart,
       max: exportEnd
     });
+    adjustmentTimelineInstance.setOptions({
+      height: fullAdjustmentHeight + "px",
+      verticalScroll: false,
+      groupHeightMode: "fitItems",
+      min: exportStart,
+      max: exportEnd
+    });
 
     // Height changes can make vis-timeline recalculate its root width.
     // Reapply the on-screen widths before the export redraw.
@@ -1616,8 +1811,10 @@ async function exportTimelineAsJpeg() {
 
     trendTimelineInstance.redraw();
     paradigmTimelineInstance.redraw();
+    adjustmentTimelineInstance.redraw();
     trendTimelineInstance.setWindow(exportStart, exportEnd, { animation: false });
     paradigmTimelineInstance.setWindow(exportStart, exportEnd, { animation: false });
+    adjustmentTimelineInstance.setWindow(exportStart, exportEnd, { animation: false });
 
     await nextAnimationFrame();
     await nextAnimationFrame();
@@ -1626,19 +1823,35 @@ async function exportTimelineAsJpeg() {
     // export row height. Measure the actual rendered rows and expand until the
     // final arrow clears the time-axis panel instead of relying on estimation.
     for (let correctionIndex = 0; correctionIndex < 3; correctionIndex += 1) {
-      const heightDeficit = measureTrendExportHeightDeficit();
-      if (heightDeficit <= 0) {
+      const trendHeightDeficit = measureTrendExportHeightDeficit();
+      const paradigmHeightDeficit = measureTimelineExportHeightDeficit(el.timelineBottom, ".vis-item.paradigm-range");
+      const adjustmentHeightDeficit = measureTimelineExportHeightDeficit(el.timelineAdjustments, ".vis-item.adjustment-range");
+      if (trendHeightDeficit <= 0 && paradigmHeightDeficit <= 0 && adjustmentHeightDeficit <= 0) {
         break;
       }
 
-      fullTrendHeight += heightDeficit;
-      fullChartHeight += heightDeficit;
+      fullTrendHeight += trendHeightDeficit;
+      fullParadigmHeight += paradigmHeightDeficit;
+      fullAdjustmentHeight += adjustmentHeightDeficit;
+      fullChartHeight += trendHeightDeficit + paradigmHeightDeficit + adjustmentHeightDeficit;
       el.timelineStage.style.height = (titleHeight + fullChartHeight) + "px";
       el.timelineChartArea.style.height = fullChartHeight + "px";
+      el.timelineChartArea.style.setProperty("--chart-content-height", fullChartHeight + "px");
       el.timelineShell.style.height = fullTrendHeight + "px";
+      el.paradigmShell.style.height = fullParadigmHeight + "px";
+      el.adjustmentShell.style.height = fullAdjustmentHeight + "px";
+      el.timelineLabelRail.style.setProperty("--trend-label-height", fullTrendHeight + "px");
+      el.timelineLabelRail.style.setProperty("--paradigm-label-height", fullParadigmHeight + "px");
+      el.timelineLabelRail.style.setProperty("--adjustment-label-height", fullAdjustmentHeight + "px");
       trendTimelineInstance.setOptions({ height: fullTrendHeight + "px" });
+      paradigmTimelineInstance.setOptions({ height: fullParadigmHeight + "px" });
+      adjustmentTimelineInstance.setOptions({ height: fullAdjustmentHeight + "px" });
       trendTimelineInstance.redraw();
+      paradigmTimelineInstance.redraw();
+      adjustmentTimelineInstance.redraw();
       trendTimelineInstance.setWindow(exportStart, exportEnd, { animation: false });
+      paradigmTimelineInstance.setWindow(exportStart, exportEnd, { animation: false });
+      adjustmentTimelineInstance.setWindow(exportStart, exportEnd, { animation: false });
       await nextAnimationFrame();
       await nextAnimationFrame();
     }
@@ -1699,36 +1912,42 @@ async function exportTimelineAsJpeg() {
       el.timelineStage.classList.remove("is-exporting-image");
       el.timelineStage.classList.remove("is-mobile-export");
 
-      if (trendTimelineInstance && paradigmTimelineInstance && currentTrendOptions && currentParadigmOptions) {
+      if (trendTimelineInstance && paradigmTimelineInstance && adjustmentTimelineInstance &&
+          currentTrendOptions && currentParadigmOptions && currentAdjustmentOptions) {
         const trendBounds = buildBounds(currentTrendOptions);
         const paradigmBounds = buildBounds(currentParadigmOptions);
+        const adjustmentBounds = buildBounds(currentAdjustmentOptions);
         lastAppliedTimelineHeights = null;
         const timelineHeights = calculateTimelineHeights(currentTrendOptions);
         applyTimelineShellHeights(timelineHeights);
-        el.timelineLabelRail.style.setProperty(
-          "--paradigm-label-height",
-          timelineHeights.paradigmHeight + "px"
-        );
         trendTimelineInstance.setOptions({
           ...trendBounds,
           height: timelineHeights.trendHeight + "px",
-          verticalScroll: true,
-          groupHeightMode: "fixed"
+          verticalScroll: false,
+          groupHeightMode: "fitItems"
         });
         paradigmTimelineInstance.setOptions({
           ...paradigmBounds,
           height: timelineHeights.paradigmHeight + "px",
-          verticalScroll: true,
-          groupHeightMode: "fixed"
+          verticalScroll: false,
+          groupHeightMode: "fitItems"
+        });
+        adjustmentTimelineInstance.setOptions({
+          ...adjustmentBounds,
+          height: timelineHeights.adjustmentHeight + "px",
+          verticalScroll: false,
+          groupHeightMode: "fitItems"
         });
         trendTimelineInstance.redraw();
         paradigmTimelineInstance.redraw();
+        adjustmentTimelineInstance.redraw();
         await nextAnimationFrame();
         await nextAnimationFrame();
         resetTimelineZoom(false);
         await nextAnimationFrame();
         anchorTrendEndpointYears();
       }
+      el.timelineChartArea.scrollTop = originalChartScrollTop;
     } finally {
       el.exportLoadingOverlay.classList.add("hidden");
       el.timelineStage.removeAttribute("aria-busy");
@@ -1819,7 +2038,7 @@ async function loadAndRenderTimeline(forceRefresh) {
     const data = buildTimelineData(workbookData, config);
     const elapsed = ((performance.now() - t0) / 1000).toFixed(1);
 
-    if (data.trendItems.length + data.paradigmItems.length === 0) {
+    if (data.trendItems.length + data.paradigmItems.length + data.adjustmentItems.length === 0) {
       setErrorState(config.label + " has no data yet.");
       return;
     }
@@ -1917,6 +2136,9 @@ function setFullscreenMode(nextFullscreen) {
       if (paradigmTimelineInstance) {
         paradigmTimelineInstance.redraw();
       }
+      if (adjustmentTimelineInstance) {
+        adjustmentTimelineInstance.redraw();
+      }
     });
   });
 
@@ -2000,13 +2222,14 @@ function scheduleTimelineResize() {
   }
   resizeFrame = requestAnimationFrame(function () {
     resizeFrame = null;
-    if (isExportingImage || !trendTimelineInstance || !paradigmTimelineInstance) {
+    if (isExportingImage || !trendTimelineInstance || !paradigmTimelineInstance || !adjustmentTimelineInstance) {
       return;
     }
     const changed = applyTimelineHeights();
     if (changed) {
       trendTimelineInstance.redraw();
       paradigmTimelineInstance.redraw();
+      adjustmentTimelineInstance.redraw();
     }
     scheduleDefaultTimelineRangeTitleLayout();
   });

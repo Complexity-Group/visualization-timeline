@@ -1,6 +1,6 @@
 const TIMELINE_SHEET_NAME = "TIMELINE";
 const TIMELINE_REQUIRED_HEADERS = ["Title", "Start", "End", "Increment"];
-const DATA_REQUIRED_HEADERS = ["Start Yr", "Event", "Paradigm"];
+const DATA_REQUIRED_HEADERS = ["Start Yr", "Events", "Social Paradigms", "Adjustments"];
 
 function toInteger(value) {
   if (value == null || String(value).trim() === "") {
@@ -103,8 +103,9 @@ function parseTimelineSheet(workbook) {
 function parseDataSheet(workbook, sheetName) {
   const table = readSheetTable(workbook, sheetName, DATA_REQUIRED_HEADERS);
   const yearIndex = table.columnIndex("Start Yr");
-  const eventIndex = table.columnIndex("Event");
-  const paradigmIndex = table.columnIndex("Paradigm");
+  const eventIndex = table.columnIndex("Events");
+  const paradigmIndex = table.columnIndex("Social Paradigms");
+  const adjustmentIndex = table.columnIndex("Adjustments");
   const events = [];
 
   for (let index = 0; index < table.rows.length; index += 1) {
@@ -112,7 +113,8 @@ function parseDataSheet(workbook, sheetName) {
     const rawYear = row[yearIndex];
     const event = String(row[eventIndex] == null ? "" : row[eventIndex]).trim();
     const paradigm = cleanParadigm(row[paradigmIndex]);
-    if (isBlankCell(rawYear) && !event && !paradigm) {
+    const adjustment = cleanParadigm(row[adjustmentIndex]);
+    if (isBlankCell(rawYear) && !event && !paradigm && !adjustment) {
       continue;
     }
 
@@ -121,10 +123,10 @@ function parseDataSheet(workbook, sheetName) {
       throw new Error(`Sheet "${sheetName}" has an invalid Start Yr near data row ${index + 2}.`);
     }
     if (!event) {
-      throw new Error(`Sheet "${sheetName}" has an empty Event near data row ${index + 2}.`);
+      throw new Error(`Sheet "${sheetName}" has an empty Events value near data row ${index + 2}.`);
     }
 
-    events.push({ startYear, event, paradigm });
+    events.push({ startYear, event, paradigm, adjustment });
   }
 
   if (!events.length) {
