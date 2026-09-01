@@ -9,6 +9,8 @@ const TREND_ROW_HEIGHT = 34;
 const TREND_TIME_AXIS_HEIGHT = 34;
 const SECONDARY_ROW_HEIGHT = 36;
 const TIMELINE_CONTAINER_TOP_PADDING = 8;
+const PARADIGM_CONTAINER_BOTTOM_PADDING = 8;
+const ADJUSTMENT_CONTAINER_BOTTOM_PADDING = 8;
 const EXPORT_TREND_ROW_HEIGHT = 52;
 const EXPORT_TIME_AXIS_HEIGHT = 54;
 
@@ -33,6 +35,8 @@ let currentAdjustmentOptions = null;
 let pendingInitialWindow = null;
 let isExportingImage = false;
 let activeExportWindow = null;
+let paradigmRenderedHeightCorrection = 0;
+let paradigmHeightFitGeneration = 0;
 
 const el = {
   widgetRoot: document.getElementById("widgetRoot"),
@@ -156,9 +160,22 @@ function createYearDate(year) {
 function yearDateInfo(year) {
   const isBce = year < 0;
   return {
-    date: createYearDate(isBce ? 0 : year),
+    date: createYearDate(year),
     isBce,
     raw: isBce ? Math.abs(year) + " BCE" : String(year)
+  };
+}
+
+function getRenderedRangeYears(startYear, endYear, timelineStartYear) {
+  if (endYear <= timelineStartYear) {
+    return {
+      startYear: timelineStartYear,
+      endYear: timelineStartYear + 10
+    };
+  }
+  return {
+    startYear,
+    endYear: startYear === endYear ? endYear + 10 : endYear
   };
 }
 
@@ -343,6 +360,9 @@ function buildTimelineData(workbookData, config) {
 
     const rangeStart = yearDateInfo(minYear);
     const rangeEnd = yearDateInfo(maxYear);
+    const renderedRangeYears = getRenderedRangeYears(minYear, maxYear, workbookData.timeline.startYear);
+    const renderedRangeStart = yearDateInfo(renderedRangeYears.startYear);
+    const renderedRangeEnd = yearDateInfo(renderedRangeYears.endYear);
     const startEndpointClass = rangeStart.date.getTime() === timelineStart.getTime() ? "" : " dot-left";
     const endEndpointClass = maxYear < ONGOING_ENDPOINT_YEAR ? " dot-right" : " arrow-right";
     const endpointClasses = startEndpointClass + endEndpointClass;
@@ -352,8 +372,8 @@ function buildTimelineData(workbookData, config) {
       subgroup,
       type: "range",
       className: "trend-range trend-color-" + (Math.abs(hashString(subgroup)) % 8) + endpointClasses,
-      start: rangeStart.date,
-      end: rangeEnd.date,
+      start: renderedRangeStart.date,
+      end: renderedRangeEnd.date,
       startYear: minYear,
       startRaw: rangeStart.raw,
       endRaw: rangeEnd.raw,
@@ -422,6 +442,13 @@ function buildTimelineData(workbookData, config) {
   paradigms.forEach(function (paradigm, paradigmKey) {
     const startInfo = yearDateInfo(paradigm.minYear);
     const endInfo = yearDateInfo(paradigm.maxYear);
+    const renderedRangeYears = getRenderedRangeYears(
+      paradigm.minYear,
+      paradigm.maxYear,
+      workbookData.timeline.startYear
+    );
+    const renderedStartInfo = yearDateInfo(renderedRangeYears.startYear);
+    const renderedEndInfo = yearDateInfo(renderedRangeYears.endYear);
     timeline.paradigmSubgroups.add(paradigmKey);
     timeline.paradigmItems.push({
       id: "paradigm-" + paradigmCounter++,
@@ -431,8 +458,8 @@ function buildTimelineData(workbookData, config) {
       className: "paradigm-range"
         + (paradigm.minYear === workbookData.timeline.startYear ? "" : " dot-left")
         + (paradigm.maxYear < ONGOING_ENDPOINT_YEAR ? " dot-right" : " arrow-right"),
-      start: startInfo.date,
-      end: endInfo.date,
+      start: renderedStartInfo.date,
+      end: renderedEndInfo.date,
       startYear: paradigm.minYear,
       startRaw: startInfo.raw,
       endRaw: endInfo.raw,
@@ -448,6 +475,13 @@ function buildTimelineData(workbookData, config) {
   adjustments.forEach(function (adjustment, adjustmentKey) {
     const startInfo = yearDateInfo(adjustment.minYear);
     const endInfo = yearDateInfo(adjustment.maxYear);
+    const renderedRangeYears = getRenderedRangeYears(
+      adjustment.minYear,
+      adjustment.maxYear,
+      workbookData.timeline.startYear
+    );
+    const renderedStartInfo = yearDateInfo(renderedRangeYears.startYear);
+    const renderedEndInfo = yearDateInfo(renderedRangeYears.endYear);
     timeline.adjustmentSubgroups.add(adjustmentKey);
     timeline.adjustmentItems.push({
       id: "adjustment-" + adjustmentCounter++,
@@ -457,8 +491,8 @@ function buildTimelineData(workbookData, config) {
       className: "adjustment-range"
         + (adjustment.minYear === workbookData.timeline.startYear ? "" : " dot-left")
         + (adjustment.maxYear < ONGOING_ENDPOINT_YEAR ? " dot-right" : " arrow-right"),
-      start: startInfo.date,
-      end: endInfo.date,
+      start: renderedStartInfo.date,
+      end: renderedEndInfo.date,
       startYear: adjustment.minYear,
       startRaw: startInfo.raw,
       endRaw: endInfo.raw,
@@ -586,7 +620,7 @@ function calculateTimelineHeights(trendOptions) {
         ? currentParadigmOptions.height
         : SECONDARY_ROW_HEIGHT),
       SECONDARY_ROW_HEIGHT
-    ),
+    ) + paradigmRenderedHeightCorrection,
     adjustmentHeight: Math.max(
       Math.round(currentAdjustmentOptions && currentAdjustmentOptions.height
         ? currentAdjustmentOptions.height
@@ -602,8 +636,12 @@ function getInitialTimelineHeight() {
 
 function applyTimelineShellHeights(heights) {
   const trendShellHeight = heights.trendHeight + TIMELINE_CONTAINER_TOP_PADDING;
-  const paradigmShellHeight = heights.paradigmHeight + TIMELINE_CONTAINER_TOP_PADDING;
-  const adjustmentShellHeight = heights.adjustmentHeight + TIMELINE_CONTAINER_TOP_PADDING;
+  const paradigmShellHeight = heights.paradigmHeight
+    + TIMELINE_CONTAINER_TOP_PADDING
+    + PARADIGM_CONTAINER_BOTTOM_PADDING;
+  const adjustmentShellHeight = heights.adjustmentHeight
+    + TIMELINE_CONTAINER_TOP_PADDING
+    + ADJUSTMENT_CONTAINER_BOTTOM_PADDING;
   el.timelineShell.style.flex = "0 0 " + trendShellHeight + "px";
   el.timelineShell.style.height = trendShellHeight + "px";
   el.paradigmShell.style.flex = "0 0 " + paradigmShellHeight + "px";
@@ -716,7 +754,7 @@ function buildBottomOptions(baseOptions) {
   return {
     ...baseOptions,
     ...bounds,
-    height: (initialHeight + TIMELINE_CONTAINER_TOP_PADDING) + "px",
+    height: (initialHeight + TIMELINE_CONTAINER_TOP_PADDING + PARADIGM_CONTAINER_BOTTOM_PADDING) + "px",
     orientation: "top",
     verticalScroll: false,
     zoomable: true,
@@ -757,9 +795,68 @@ function applyTimelineHeights() {
   lastAppliedTimelineHeights = heightKey;
   applyTimelineShellHeights(heights);
   trendTimelineInstance.setOptions({ height: (heights.trendHeight + TIMELINE_CONTAINER_TOP_PADDING) + "px" });
-  paradigmTimelineInstance.setOptions({ height: (heights.paradigmHeight + TIMELINE_CONTAINER_TOP_PADDING) + "px" });
-  adjustmentTimelineInstance.setOptions({ height: (heights.adjustmentHeight + TIMELINE_CONTAINER_TOP_PADDING) + "px" });
+  paradigmTimelineInstance.setOptions({
+    height: (heights.paradigmHeight + TIMELINE_CONTAINER_TOP_PADDING + PARADIGM_CONTAINER_BOTTOM_PADDING) + "px"
+  });
+  adjustmentTimelineInstance.setOptions({
+    height: (heights.adjustmentHeight + TIMELINE_CONTAINER_TOP_PADDING + ADJUSTMENT_CONTAINER_BOTTOM_PADDING) + "px"
+  });
   return true;
+}
+
+function fitParadigmTimelineHeightToRenderedContent() {
+  if (isExportingImage || !paradigmTimelineInstance) {
+    return false;
+  }
+
+  const heightDeficit = measureTimelineHeightDeficit(
+    el.timelineBottom,
+    ".vis-item.paradigm-range",
+    PARADIGM_CONTAINER_BOTTOM_PADDING
+  );
+  if (heightDeficit <= 0) {
+    return false;
+  }
+
+  // Row-count estimates can be short by a few pixels per subgroup. Preserve
+  // the measured correction for this tab so later resizes and export cleanup
+  // cannot restore the clipped estimated height.
+  paradigmRenderedHeightCorrection += heightDeficit;
+  const heights = calculateTimelineHeights(currentTrendOptions);
+  lastAppliedTimelineHeights = heights.trendHeight + ":" + heights.paradigmHeight + ":" + heights.adjustmentHeight;
+  applyTimelineShellHeights(heights);
+  paradigmTimelineInstance.setOptions({
+    height: (heights.paradigmHeight + TIMELINE_CONTAINER_TOP_PADDING + PARADIGM_CONTAINER_BOTTOM_PADDING) + "px"
+  });
+  paradigmTimelineInstance.redraw();
+  scrollTimelineToFirstRow(paradigmTimelineInstance, el.timelineBottom);
+  return true;
+}
+
+function scheduleParadigmTimelineContentFit() {
+  const generation = ++paradigmHeightFitGeneration;
+
+  function runFitPass(attempt) {
+    requestAnimationFrame(function () {
+      if (generation !== paradigmHeightFitGeneration || isExportingImage || !paradigmTimelineInstance) {
+        return;
+      }
+
+      scrollTimelineToFirstRow(paradigmTimelineInstance, el.timelineBottom);
+      requestAnimationFrame(function () {
+        if (generation !== paradigmHeightFitGeneration || isExportingImage) {
+          return;
+        }
+
+        const changed = fitParadigmTimelineHeightToRenderedContent();
+        if (changed && attempt < 2) {
+          runFitPass(attempt + 1);
+        }
+      });
+    });
+  }
+
+  runFitPass(0);
 }
 
 function syncTimelineWindows(instances) {
@@ -814,6 +911,7 @@ function refreshVisibleTimelines() {
       paradigmTimelineInstance.setWindow(topWindow.start, topWindow.end, { animation: false });
       adjustmentTimelineInstance.setWindow(topWindow.start, topWindow.end, { animation: false });
       scheduleInitialTopTimelineScroll();
+      scheduleParadigmTimelineContentFit();
     });
   });
 }
@@ -877,6 +975,13 @@ function unwrapDefaultTimelineRangeContent() {
       // their complete labels while preserving the range as the click target.
       if (content && content.parentElement !== range) {
         range.appendChild(content);
+      }
+
+      if (!range.querySelector(":scope > .range-click-target")) {
+        const clickTarget = document.createElement("span");
+        clickTarget.className = "range-click-target";
+        clickTarget.setAttribute("aria-hidden", "true");
+        range.appendChild(clickTarget);
       }
     }
   }
@@ -950,8 +1055,10 @@ function positionDefaultTimelineRangeTitles() {
 }
 
 function buildAdjustmentOptions(baseOptions, timeAxisStep) {
+  const topOptions = buildTopOptions(baseOptions, timeAxisStep);
   return {
-    ...buildTopOptions(baseOptions, timeAxisStep),
+    ...topOptions,
+    height: (parseFloat(topOptions.height) + ADJUSTMENT_CONTAINER_BOTTOM_PADDING) + "px",
     orientation: {
       axis: "top",
       item: "top"
@@ -1019,7 +1126,7 @@ function scrollAllTimelinesToFirstRow() {
   scrollTimelineToFirstRow(adjustmentTimelineInstance, el.timelineAdjustments);
 }
 
-function measureTimelineExportHeightDeficit(root, rangeSelector) {
+function measureTimelineHeightDeficit(root, rangeSelector, bottomClearance) {
   const itemPanel = root.querySelector(".vis-panel.vis-center");
   const ranges = root.querySelectorAll(rangeSelector);
   if (!itemPanel || !ranges.length) {
@@ -1032,8 +1139,14 @@ function measureTimelineExportHeightDeficit(root, rangeSelector) {
     lastRangeBottom = Math.max(lastRangeBottom, ranges[i].getBoundingClientRect().bottom);
   }
 
+  return Math.max(Math.ceil(
+    lastRangeBottom - panelBounds.bottom + (bottomClearance || 0)
+  ), 0);
+}
+
+function measureTimelineExportHeightDeficit(root, rangeSelector) {
   // Keep a small margin between the final arrow and the bottom time axis.
-  return Math.max(Math.ceil(lastRangeBottom - panelBounds.bottom + 4), 0);
+  return measureTimelineHeightDeficit(root, rangeSelector, 4);
 }
 
 function measureTrendExportHeightDeficit() {
@@ -1090,6 +1203,8 @@ function renderTimeline(data) {
   currentTrendOptions = data.trendOptions;
   currentParadigmOptions = data.paradigmOptions;
   currentAdjustmentOptions = data.adjustmentOptions;
+  paradigmRenderedHeightCorrection = 0;
+  paradigmHeightFitGeneration += 1;
   lastAppliedTimelineHeights = null;
   el.timelineTitle.textContent = data.title;
   el.trendSectionLabel.textContent = TIMELINE_CONFIGS[activeTabKey].label;
@@ -1781,12 +1896,14 @@ async function exportTimelineAsJpeg() {
       78
     );
     let fullChartHeight = fullTrendHeight + fullParadigmHeight + fullAdjustmentHeight
-      + TIMELINE_CONTAINER_TOP_PADDING * 3;
+      + TIMELINE_CONTAINER_TOP_PADDING * 3
+      + PARADIGM_CONTAINER_BOTTOM_PADDING
+      + ADJUSTMENT_CONTAINER_BOTTOM_PADDING;
     const titleHeight = Math.ceil(el.timelineTitle.getBoundingClientRect().height);
 
-    el.timelineLabelRail.style.setProperty("--paradigm-label-height", (fullParadigmHeight + TIMELINE_CONTAINER_TOP_PADDING) + "px");
+    el.timelineLabelRail.style.setProperty("--paradigm-label-height", (fullParadigmHeight + TIMELINE_CONTAINER_TOP_PADDING + PARADIGM_CONTAINER_BOTTOM_PADDING) + "px");
     el.timelineLabelRail.style.setProperty("--trend-label-height", (fullTrendHeight + TIMELINE_CONTAINER_TOP_PADDING) + "px");
-    el.timelineLabelRail.style.setProperty("--adjustment-label-height", (fullAdjustmentHeight + TIMELINE_CONTAINER_TOP_PADDING) + "px");
+    el.timelineLabelRail.style.setProperty("--adjustment-label-height", (fullAdjustmentHeight + TIMELINE_CONTAINER_TOP_PADDING + ADJUSTMENT_CONTAINER_BOTTOM_PADDING) + "px");
     el.timelineChartArea.style.setProperty("--chart-content-height", fullChartHeight + "px");
 
     el.timelineStage.style.flex = "0 0 auto";
@@ -1802,9 +1919,9 @@ async function exportTimelineAsJpeg() {
     el.timelineShell.style.flex = "0 0 auto";
     el.timelineShell.style.height = (fullTrendHeight + TIMELINE_CONTAINER_TOP_PADDING) + "px";
     el.paradigmShell.style.flex = "0 0 auto";
-    el.paradigmShell.style.height = (fullParadigmHeight + TIMELINE_CONTAINER_TOP_PADDING) + "px";
+    el.paradigmShell.style.height = (fullParadigmHeight + TIMELINE_CONTAINER_TOP_PADDING + PARADIGM_CONTAINER_BOTTOM_PADDING) + "px";
     el.adjustmentShell.style.flex = "0 0 auto";
-    el.adjustmentShell.style.height = (fullAdjustmentHeight + TIMELINE_CONTAINER_TOP_PADDING) + "px";
+    el.adjustmentShell.style.height = (fullAdjustmentHeight + TIMELINE_CONTAINER_TOP_PADDING + ADJUSTMENT_CONTAINER_BOTTOM_PADDING) + "px";
 
     const exportStart = new Date(currentParadigmOptions.start);
     const exactExportEnd = new Date(currentParadigmOptions.end);
@@ -1820,14 +1937,14 @@ async function exportTimelineAsJpeg() {
       max: exportEnd
     });
     paradigmTimelineInstance.setOptions({
-      height: (fullParadigmHeight + TIMELINE_CONTAINER_TOP_PADDING) + "px",
+      height: (fullParadigmHeight + TIMELINE_CONTAINER_TOP_PADDING + PARADIGM_CONTAINER_BOTTOM_PADDING) + "px",
       verticalScroll: false,
       groupHeightMode: "fitItems",
       min: exportStart,
       max: exportEnd
     });
     adjustmentTimelineInstance.setOptions({
-      height: (fullAdjustmentHeight + TIMELINE_CONTAINER_TOP_PADDING) + "px",
+      height: (fullAdjustmentHeight + TIMELINE_CONTAINER_TOP_PADDING + ADJUSTMENT_CONTAINER_BOTTOM_PADDING) + "px",
       verticalScroll: false,
       groupHeightMode: "fitItems",
       min: exportStart,
@@ -1867,14 +1984,14 @@ async function exportTimelineAsJpeg() {
       el.timelineChartArea.style.height = fullChartHeight + "px";
       el.timelineChartArea.style.setProperty("--chart-content-height", fullChartHeight + "px");
       el.timelineShell.style.height = (fullTrendHeight + TIMELINE_CONTAINER_TOP_PADDING) + "px";
-      el.paradigmShell.style.height = (fullParadigmHeight + TIMELINE_CONTAINER_TOP_PADDING) + "px";
-      el.adjustmentShell.style.height = (fullAdjustmentHeight + TIMELINE_CONTAINER_TOP_PADDING) + "px";
+      el.paradigmShell.style.height = (fullParadigmHeight + TIMELINE_CONTAINER_TOP_PADDING + PARADIGM_CONTAINER_BOTTOM_PADDING) + "px";
+      el.adjustmentShell.style.height = (fullAdjustmentHeight + TIMELINE_CONTAINER_TOP_PADDING + ADJUSTMENT_CONTAINER_BOTTOM_PADDING) + "px";
       el.timelineLabelRail.style.setProperty("--trend-label-height", (fullTrendHeight + TIMELINE_CONTAINER_TOP_PADDING) + "px");
-      el.timelineLabelRail.style.setProperty("--paradigm-label-height", (fullParadigmHeight + TIMELINE_CONTAINER_TOP_PADDING) + "px");
-      el.timelineLabelRail.style.setProperty("--adjustment-label-height", (fullAdjustmentHeight + TIMELINE_CONTAINER_TOP_PADDING) + "px");
+      el.timelineLabelRail.style.setProperty("--paradigm-label-height", (fullParadigmHeight + TIMELINE_CONTAINER_TOP_PADDING + PARADIGM_CONTAINER_BOTTOM_PADDING) + "px");
+      el.timelineLabelRail.style.setProperty("--adjustment-label-height", (fullAdjustmentHeight + TIMELINE_CONTAINER_TOP_PADDING + ADJUSTMENT_CONTAINER_BOTTOM_PADDING) + "px");
       trendTimelineInstance.setOptions({ height: (fullTrendHeight + TIMELINE_CONTAINER_TOP_PADDING) + "px" });
-      paradigmTimelineInstance.setOptions({ height: (fullParadigmHeight + TIMELINE_CONTAINER_TOP_PADDING) + "px" });
-      adjustmentTimelineInstance.setOptions({ height: (fullAdjustmentHeight + TIMELINE_CONTAINER_TOP_PADDING) + "px" });
+      paradigmTimelineInstance.setOptions({ height: (fullParadigmHeight + TIMELINE_CONTAINER_TOP_PADDING + PARADIGM_CONTAINER_BOTTOM_PADDING) + "px" });
+      adjustmentTimelineInstance.setOptions({ height: (fullAdjustmentHeight + TIMELINE_CONTAINER_TOP_PADDING + ADJUSTMENT_CONTAINER_BOTTOM_PADDING) + "px" });
       trendTimelineInstance.redraw();
       paradigmTimelineInstance.redraw();
       adjustmentTimelineInstance.redraw();
@@ -1957,13 +2074,13 @@ async function exportTimelineAsJpeg() {
         });
         paradigmTimelineInstance.setOptions({
           ...paradigmBounds,
-          height: (timelineHeights.paradigmHeight + TIMELINE_CONTAINER_TOP_PADDING) + "px",
+          height: (timelineHeights.paradigmHeight + TIMELINE_CONTAINER_TOP_PADDING + PARADIGM_CONTAINER_BOTTOM_PADDING) + "px",
           verticalScroll: false,
           groupHeightMode: "fitItems"
         });
         adjustmentTimelineInstance.setOptions({
           ...adjustmentBounds,
-          height: (timelineHeights.adjustmentHeight + TIMELINE_CONTAINER_TOP_PADDING) + "px",
+          height: (timelineHeights.adjustmentHeight + TIMELINE_CONTAINER_TOP_PADDING + ADJUSTMENT_CONTAINER_BOTTOM_PADDING) + "px",
           verticalScroll: false,
           groupHeightMode: "fitItems"
         });
@@ -2261,6 +2378,7 @@ function scheduleTimelineResize() {
       adjustmentTimelineInstance.redraw();
     }
     scheduleDefaultTimelineRangeTitleLayout();
+    scheduleParadigmTimelineContentFit();
   });
 }
 

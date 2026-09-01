@@ -596,6 +596,11 @@
       box-sizing: border-box;
     }
 
+    #timelineBottom .vis-panel.vis-center > .vis-content,
+    #timelineAdjustments .vis-panel.vis-center > .vis-content {
+      padding-bottom: 8px;
+    }
+
     .timeline-top-shell {
       flex: 0 0 auto;
       min-height: 0;
@@ -828,6 +833,32 @@
     .vis-item.trend-range:hover,
     .vis-item.paradigm-range:hover {
       filter: brightness(0.92) saturate(1.15);
+    }
+
+    .range-click-target {
+      position: absolute;
+      left: -6px;
+      right: -8px;
+      display: block;
+      background: transparent;
+      cursor: pointer;
+      pointer-events: auto;
+      z-index: 1;
+    }
+
+    .vis-item.trend-range > .range-click-target {
+      top: -2px;
+      bottom: -2px;
+    }
+
+    .vis-item.paradigm-range > .range-click-target,
+    .vis-item.adjustment-range > .range-click-target {
+      top: -4px;
+      bottom: -4px;
+    }
+
+    .timeline-stage.is-exporting-image .range-click-target {
+      display: none !important;
     }
 
     .timeline-stage.is-exporting-image .vis-item.trend-range,
