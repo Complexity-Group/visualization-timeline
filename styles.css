@@ -528,6 +528,11 @@
       height: calc(var(--trend-label-height, 108px) - 54px);
     }
 
+    .timeline-stage.is-exporting-image .timeline-part-label.adjustments {
+      flex-basis: calc(var(--adjustment-label-height, 116px) - 54px);
+      height: calc(var(--adjustment-label-height, 116px) - 54px);
+    }
+
     .timeline-part-label {
       display: flex;
       align-items: center;
@@ -561,8 +566,8 @@
     }
 
     .timeline-part-label.adjustments {
-      flex: 0 0 var(--adjustment-label-height, 36px);
-      height: var(--adjustment-label-height, 36px);
+      flex: 0 0 calc(var(--adjustment-label-height, 78px) - 34px);
+      height: calc(var(--adjustment-label-height, 78px) - 34px);
       background: var(--bg-elevated);
     }
 
@@ -582,6 +587,13 @@
       overflow: visible;
       background: var(--card);
       width: 100%;
+    }
+
+    #timelineTop .vis-panel.vis-center > .vis-content,
+    #timelineBottom .vis-panel.vis-center > .vis-content,
+    #timelineAdjustments .vis-panel.vis-center > .vis-content {
+      padding-top: 8px;
+      box-sizing: border-box;
     }
 
     .timeline-top-shell {
@@ -1169,13 +1181,10 @@
       white-space: nowrap;
     }
 
-    /* Bottom timeline only displays paradigm ranges; axis stays on top timeline. */
+    /* The paradigms timeline has no axis; energy uses a bottom axis and adjustments a top axis. */
     .timeline-bottom-shell .vis-time-axis,
     .timeline-bottom-shell .vis-panel.vis-top,
-    .timeline-bottom-shell .vis-panel.vis-bottom,
-    .timeline-adjustment-shell .vis-time-axis,
-    .timeline-adjustment-shell .vis-panel.vis-top,
-    .timeline-adjustment-shell .vis-panel.vis-bottom {
+    .timeline-bottom-shell .vis-panel.vis-bottom {
       display: none;
     }
 
@@ -1553,6 +1562,16 @@
       .timeline-part-label.time {
         flex-basis: 30px;
         height: 30px;
+      }
+
+      .timeline-part-label.trends {
+        flex-basis: calc(var(--trend-label-height, 60px) - 30px);
+        height: calc(var(--trend-label-height, 60px) - 30px);
+      }
+
+      .timeline-part-label.adjustments {
+        flex-basis: calc(var(--adjustment-label-height, 68px) - 30px);
+        height: calc(var(--adjustment-label-height, 68px) - 30px);
       }
 
       div.vis-time-axis.vis-foreground {
