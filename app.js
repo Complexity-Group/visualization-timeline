@@ -5,6 +5,8 @@ const DEFAULT_GROUP_ID = "default";
 const PARADIGM_GROUP_ID = "paradigms";
 const TREND_ROW_HEIGHT = 34;
 const TREND_TIME_AXIS_HEIGHT = 34;
+const EXPORT_TREND_ROW_HEIGHT = 52;
+const EXPORT_TIME_AXIS_HEIGHT = 54;
 
 let trendTimelineInstance = null;
 let paradigmTimelineInstance = null;
@@ -189,7 +191,7 @@ function compareSubgroupsByDuration(first, second) {
 }
 
 function compareTopTimelineSubgroups(first, second) {
-  return compareSubgroupsByStartDate(second, first);
+  return compareSubgroupsByStartDate(first, second);
 }
 
 function compareSubgroupsByStartDate(first, second) {
@@ -400,6 +402,7 @@ function buildTimelineData(workbookData, config) {
       className: "paradigm-range arrow-right" + (paradigm.minYear === workbookData.timeline.startYear ? "" : " dot-left"),
       start: startInfo.date,
       end: endInfo.date,
+      startYear: paradigm.minYear,
       startRaw: startInfo.raw,
       endRaw: endInfo.raw,
       startIsBce: startInfo.isBce,
@@ -418,21 +421,25 @@ function buildTimelineData(workbookData, config) {
     timeline.trendSubgroups,
     timeline.trendItems
   );
-  const orderedParadigmSubgroups = orderSubgroupsByDuration(
+  const orderedParadigmSubgroups = orderSubgroupsByStartDate(
     timeline.paradigmSubgroups,
     timeline.paradigmItems
   );
 
   return {
     title: timeline.title,
-    // The top timeline is bottom-oriented, so reverse its subgroup comparator
-    // to make the desired order read correctly from top to bottom on screen.
+    // Items are top-oriented while the time axis remains at the bottom, so
+    // chronological subgroup order maps directly to top-to-bottom row order.
     trendGroups: [createGroupWithSubgroups(
       DEFAULT_GROUP_ID,
       orderedTrendSubgroups,
       compareTopTimelineSubgroups
     )],
-    paradigmGroups: [createGroupWithSubgroups(PARADIGM_GROUP_ID, orderedParadigmSubgroups)],
+    paradigmGroups: [createGroupWithSubgroups(
+      PARADIGM_GROUP_ID,
+      orderedParadigmSubgroups,
+      compareSubgroupsByStartDate
+    )],
     trendItems: timeline.trendItems,
     paradigmItems: timeline.paradigmItems,
     trendOptions: {
@@ -589,7 +596,10 @@ function buildTopOptions(baseOptions, timeAxisStep) {
     ...bounds,
     height: initialHeight + "px",
     zoomMin: 1000 * 60 * 60 * 24 * 365,
-    orientation: "bottom",
+    orientation: {
+      axis: "bottom",
+      item: "top"
+    },
     verticalScroll: true,
     zoomKey: "ctrlKey",
     margin: {
@@ -816,19 +826,19 @@ function positionDefaultTimelineRangeTitles() {
 
     for (let i = 0; i < paradigmRanges.length; i += 1) {
       const range = paradigmRanges[i];
-      const content = range.querySelector(".vis-item-content");
-      if (!content) {
+      const title = range.querySelector(".paradigm-title-text");
+      if (!title) {
         continue;
       }
 
-      content.style.removeProperty("--paradigm-title-left");
-      const contentBounds = content.getBoundingClientRect();
-      let targetLeft = Math.max(contentBounds.left, panelLeft);
-      if (targetLeft + contentBounds.width > panelRight) {
-        targetLeft = Math.max(panelLeft, panelRight - contentBounds.width);
+      title.style.removeProperty("--paradigm-title-left");
+      const titleBounds = title.getBoundingClientRect();
+      let targetLeft = Math.max(titleBounds.left, panelLeft);
+      if (targetLeft + titleBounds.width > panelRight) {
+        targetLeft = Math.max(panelLeft, panelRight - titleBounds.width);
       }
 
-      content.style.setProperty("--paradigm-title-left", (targetLeft - contentBounds.left) + "px");
+      title.style.setProperty("--paradigm-title-left", (targetLeft - titleBounds.left) + "px");
     }
   }
 }
@@ -871,6 +881,23 @@ function scrollTopTimelineToFirstRow() {
   if (sideScrollPanel) {
     sideScrollPanel.scrollTop = 0;
   }
+}
+
+function measureTrendExportHeightDeficit() {
+  const itemPanel = el.timelineTop.querySelector(".vis-panel.vis-center");
+  const ranges = el.timelineTop.querySelectorAll(".vis-item.trend-range");
+  if (!itemPanel || !ranges.length) {
+    return 0;
+  }
+
+  const panelBounds = itemPanel.getBoundingClientRect();
+  let lastRangeBottom = panelBounds.top;
+  for (let i = 0; i < ranges.length; i += 1) {
+    lastRangeBottom = Math.max(lastRangeBottom, ranges[i].getBoundingClientRect().bottom);
+  }
+
+  // Keep a small margin between the final arrow and the bottom time axis.
+  return Math.max(Math.ceil(lastRangeBottom - panelBounds.bottom + 4), 0);
 }
 
 function scheduleInitialTopTimelineScroll() {
@@ -1344,6 +1371,11 @@ function neutralizeExportBackgroundImages(clonedDocument) {
       exportLine.style.setProperty("right", "0", "important");
       exportLine.style.setProperty("width", "auto", "important");
       exportLine.style.setProperty("transform", "none", "important");
+
+      const exportArrowhead = clonedDocument.createElement("span");
+      exportArrowhead.className = "range-export-arrowhead trend-export-arrowhead";
+      exportArrowhead.setAttribute("aria-hidden", "true");
+      range.appendChild(exportArrowhead);
     }
   }
 
@@ -1397,6 +1429,16 @@ function neutralizeExportBackgroundImages(clonedDocument) {
     exportLine.className = "trend-export-line";
     exportLine.setAttribute("aria-hidden", "true");
     range.replaceChildren(exportLine, content);
+    if (range.classList.contains("dot-left")) {
+      const startDot = clonedDocument.createElement("span");
+      startDot.className = "paradigm-export-start-dot";
+      startDot.setAttribute("aria-hidden", "true");
+      range.appendChild(startDot);
+    }
+    const arrowhead = clonedDocument.createElement("span");
+    arrowhead.className = "range-export-arrowhead paradigm-export-arrowhead";
+    arrowhead.setAttribute("aria-hidden", "true");
+    range.appendChild(arrowhead);
     content.style.setProperty("position", "absolute", "important");
     content.style.setProperty("display", "block", "important");
     content.style.setProperty("top", "auto", "important");
@@ -1505,12 +1547,17 @@ async function exportTimelineAsJpeg() {
     const trendRangeCount = currentTrendItems.filter(function (item) {
       return item.type === "range";
     }).length;
-    const fullTrendHeight = Math.max(trendRangeCount * 52 + 80, 78);
+    // The export axis is 52px high with a 54px rail band. Include that full
+    // band so the final top-timeline row cannot be laid out behind the axis.
+    let fullTrendHeight = Math.max(
+      trendRangeCount * EXPORT_TREND_ROW_HEIGHT + EXPORT_TIME_AXIS_HEIGHT,
+      78
+    );
     const paradigmRangeCount = currentParadigmItems.filter(function (item) {
       return item.type === "range";
     }).length;
-    const fullParadigmHeight = Math.max(paradigmRangeCount * 52 + 50, 76);
-    const fullChartHeight = fullTrendHeight + fullParadigmHeight;
+    const fullParadigmHeight = Math.max(paradigmRangeCount * 52, 76);
+    let fullChartHeight = fullTrendHeight + fullParadigmHeight;
     const titleHeight = Math.ceil(el.timelineTitle.getBoundingClientRect().height);
 
     el.timelineLabelRail.style.setProperty("--paradigm-label-height", fullParadigmHeight + "px");
@@ -1561,10 +1608,30 @@ async function exportTimelineAsJpeg() {
 
     await nextAnimationFrame();
     await nextAnimationFrame();
-    // Expanding a bottom-oriented timeline can preserve its former negative
-    // vertical offset, which pushes the first rows down and leaves blank space
-    // above them in the exported image. Reset after the expanded layout has
-    // settled, then allow the corrective redraw to finish before capture.
+
+    // vis-timeline can use a slightly larger subgroup pitch than the nominal
+    // export row height. Measure the actual rendered rows and expand until the
+    // final arrow clears the time-axis panel instead of relying on estimation.
+    for (let correctionIndex = 0; correctionIndex < 3; correctionIndex += 1) {
+      const heightDeficit = measureTrendExportHeightDeficit();
+      if (heightDeficit <= 0) {
+        break;
+      }
+
+      fullTrendHeight += heightDeficit;
+      fullChartHeight += heightDeficit;
+      el.timelineStage.style.height = (titleHeight + fullChartHeight) + "px";
+      el.timelineChartArea.style.height = fullChartHeight + "px";
+      el.timelineShell.style.height = fullTrendHeight + "px";
+      trendTimelineInstance.setOptions({ height: fullTrendHeight + "px" });
+      trendTimelineInstance.redraw();
+      trendTimelineInstance.setWindow(exportStart, exportEnd, { animation: false });
+      await nextAnimationFrame();
+      await nextAnimationFrame();
+    }
+
+    // Reset any scroll offset retained from the compact interactive viewport
+    // after the expanded export layout settles.
     scrollTopTimelineToFirstRow();
     await nextAnimationFrame();
     await nextAnimationFrame();
