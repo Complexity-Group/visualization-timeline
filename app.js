@@ -3,6 +3,7 @@ import { normalizeParadigmKey, parseWorkbookData } from "./workbook.js";
 
 const DEFAULT_GROUP_ID = "default";
 const PARADIGM_GROUP_ID = "paradigms";
+const ONGOING_ENDPOINT_YEAR = 2025;
 const TREND_ROW_HEIGHT = 34;
 const TREND_TIME_AXIS_HEIGHT = 34;
 const EXPORT_TREND_ROW_HEIGHT = 52;
@@ -329,9 +330,9 @@ function buildTimelineData(workbookData, config) {
 
     const rangeStart = yearDateInfo(minYear);
     const rangeEnd = yearDateInfo(maxYear);
-    const endpointClasses = rangeStart.date.getTime() === timelineStart.getTime()
-      ? " arrow-right"
-      : " arrow-right dot-left";
+    const startEndpointClass = rangeStart.date.getTime() === timelineStart.getTime() ? "" : " dot-left";
+    const endEndpointClass = maxYear < ONGOING_ENDPOINT_YEAR ? " dot-right" : " arrow-right";
+    const endpointClasses = startEndpointClass + endEndpointClass;
     timeline.trendItems.push({
       id: "trend-" + trendCounter++,
       group: DEFAULT_GROUP_ID,
@@ -399,7 +400,9 @@ function buildTimelineData(workbookData, config) {
       group: PARADIGM_GROUP_ID,
       subgroup: paradigmKey,
       type: "range",
-      className: "paradigm-range arrow-right" + (paradigm.minYear === workbookData.timeline.startYear ? "" : " dot-left"),
+      className: "paradigm-range"
+        + (paradigm.minYear === workbookData.timeline.startYear ? "" : " dot-left")
+        + (paradigm.maxYear < ONGOING_ENDPOINT_YEAR ? " dot-right" : " arrow-right"),
       start: startInfo.date,
       end: endInfo.date,
       startYear: paradigm.minYear,
@@ -1372,10 +1375,12 @@ function neutralizeExportBackgroundImages(clonedDocument) {
       exportLine.style.setProperty("width", "auto", "important");
       exportLine.style.setProperty("transform", "none", "important");
 
-      const exportArrowhead = clonedDocument.createElement("span");
-      exportArrowhead.className = "range-export-arrowhead trend-export-arrowhead";
-      exportArrowhead.setAttribute("aria-hidden", "true");
-      range.appendChild(exportArrowhead);
+      if (range.classList.contains("arrow-right")) {
+        const exportArrowhead = clonedDocument.createElement("span");
+        exportArrowhead.className = "range-export-arrowhead trend-export-arrowhead";
+        exportArrowhead.setAttribute("aria-hidden", "true");
+        range.appendChild(exportArrowhead);
+      }
     }
   }
 
@@ -1435,10 +1440,18 @@ function neutralizeExportBackgroundImages(clonedDocument) {
       startDot.setAttribute("aria-hidden", "true");
       range.appendChild(startDot);
     }
-    const arrowhead = clonedDocument.createElement("span");
-    arrowhead.className = "range-export-arrowhead paradigm-export-arrowhead";
-    arrowhead.setAttribute("aria-hidden", "true");
-    range.appendChild(arrowhead);
+    if (range.classList.contains("dot-right")) {
+      const endDot = clonedDocument.createElement("span");
+      endDot.className = "paradigm-export-end-dot";
+      endDot.setAttribute("aria-hidden", "true");
+      range.appendChild(endDot);
+    }
+    if (range.classList.contains("arrow-right")) {
+      const arrowhead = clonedDocument.createElement("span");
+      arrowhead.className = "range-export-arrowhead paradigm-export-arrowhead";
+      arrowhead.setAttribute("aria-hidden", "true");
+      range.appendChild(arrowhead);
+    }
     content.style.setProperty("position", "absolute", "important");
     content.style.setProperty("display", "block", "important");
     content.style.setProperty("top", "auto", "important");
