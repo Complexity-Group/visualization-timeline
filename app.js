@@ -189,7 +189,60 @@ function compareSubgroupsByDuration(first, second) {
 }
 
 function compareTopTimelineSubgroups(first, second) {
-  return compareSubgroupsByDuration(second, first);
+  return compareSubgroupsByStartDate(second, first);
+}
+
+function compareSubgroupsByStartDate(first, second) {
+  const startDifference = first.subgroupStartYear - second.subgroupStartYear;
+  if (startDifference !== 0) {
+    return startDifference;
+  }
+
+  return String(first.subgroupTitle).localeCompare(String(second.subgroupTitle), undefined, {
+    sensitivity: "base"
+  });
+}
+
+function orderSubgroupsByStartDate(subgroupIds, items) {
+  const summaries = {};
+
+  subgroupIds.forEach(function (subgroupId) {
+    summaries[subgroupId] = {
+      startYear: Infinity,
+      title: subgroupId
+    };
+  });
+
+  items.forEach(function (item) {
+    if (item.type !== "range" || !item.subgroup || !summaries[item.subgroup]) {
+      return;
+    }
+
+    const summary = summaries[item.subgroup];
+    summary.startYear = Math.min(summary.startYear, item.startYear);
+    summary.title = item.titleText || item.content || item.subgroup;
+  });
+
+  items.forEach(function (item) {
+    const summary = item.subgroup ? summaries[item.subgroup] : null;
+    if (summary) {
+      item.subgroupStartYear = summary.startYear;
+      item.subgroupTitle = summary.title;
+    }
+  });
+
+  return Array.from(subgroupIds).sort(function (firstId, secondId) {
+    return compareSubgroupsByStartDate(
+      {
+        subgroupStartYear: summaries[firstId].startYear,
+        subgroupTitle: summaries[firstId].title
+      },
+      {
+        subgroupStartYear: summaries[secondId].startYear,
+        subgroupTitle: summaries[secondId].title
+      }
+    );
+  });
 }
 
 function orderSubgroupsByDuration(subgroupIds, items) {
@@ -285,6 +338,7 @@ function buildTimelineData(workbookData, config) {
       className: "trend-range trend-color-" + (Math.abs(hashString(subgroup)) % 8) + endpointClasses,
       start: rangeStart.date,
       end: rangeEnd.date,
+      startYear: minYear,
       startRaw: rangeStart.raw,
       endRaw: rangeEnd.raw,
       startIsBce: rangeStart.isBce,
@@ -343,7 +397,7 @@ function buildTimelineData(workbookData, config) {
       group: PARADIGM_GROUP_ID,
       subgroup: paradigmKey,
       type: "range",
-      className: "paradigm-range",
+      className: "paradigm-range arrow-right" + (paradigm.minYear === workbookData.timeline.startYear ? "" : " dot-left"),
       start: startInfo.date,
       end: endInfo.date,
       startRaw: startInfo.raw,
@@ -360,7 +414,7 @@ function buildTimelineData(workbookData, config) {
   const bufferFactor = window.innerWidth <= 768 ? 0.02 : 0.01;
   const endWithBuffer = new Date(timelineEnd.getTime() + span * bufferFactor);
 
-  const orderedTrendSubgroups = orderSubgroupsByDuration(
+  const orderedTrendSubgroups = orderSubgroupsByStartDate(
     timeline.trendSubgroups,
     timeline.trendItems
   );
@@ -516,7 +570,11 @@ function buildParadigmItemTemplate(item) {
 
   const wrapper = document.createElement("span");
   wrapper.className = "paradigm-title-text";
-  wrapper.textContent = item.displayText || item.titleText || item.content || "";
+  const exportLine = document.createElement("span");
+  exportLine.className = "trend-export-line";
+  exportLine.setAttribute("aria-hidden", "true");
+  wrapper.appendChild(exportLine);
+  wrapper.appendChild(document.createTextNode(item.displayText || item.titleText || item.content || ""));
   wrapper.dataset.exportItemId = String(item.id || "");
   wrapper.dataset.exportStartMs = String(new Date(item.start).getTime());
   wrapper.dataset.exportEndMs = String(new Date(item.end).getTime());
@@ -1335,17 +1393,20 @@ function neutralizeExportBackgroundImages(clonedDocument) {
     const content = clonedDocument.createElement("span");
     content.className = "paradigm-export-label";
     content.textContent = sourceTitle.textContent;
-    range.replaceChildren(content);
+    const exportLine = clonedDocument.createElement("span");
+    exportLine.className = "trend-export-line";
+    exportLine.setAttribute("aria-hidden", "true");
+    range.replaceChildren(exportLine, content);
     content.style.setProperty("position", "absolute", "important");
-    content.style.setProperty("display", "flex", "important");
-    content.style.setProperty("align-items", "center", "important");
-    content.style.setProperty("top", "0", "important");
-    content.style.setProperty("left", "0", "important");
+    content.style.setProperty("display", "block", "important");
+    content.style.setProperty("top", "auto", "important");
+    content.style.setProperty("bottom", "18px", "important");
+    content.style.setProperty("left", "20px", "important");
     content.style.setProperty("width", "max-content", "important");
     content.style.setProperty("min-width", "0", "important");
     content.style.setProperty("max-width", "none", "important");
-    content.style.setProperty("min-height", "48px", "important");
-    content.style.setProperty("padding", "6px 10px", "important");
+    content.style.setProperty("min-height", "0", "important");
+    content.style.setProperty("padding", "0", "important");
     content.style.setProperty("white-space", "nowrap", "important");
     content.style.setProperty("background", "transparent", "important");
     content.style.setProperty("border", "0", "important");

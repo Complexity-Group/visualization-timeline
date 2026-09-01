@@ -650,38 +650,37 @@
     }
 
     .vis-item.paradigm-range {
-      background:
-        linear-gradient(180deg, rgba(255, 252, 247, 0.65), transparent 42%),
-        var(--paradigm-fill);
-      border: 1px solid var(--paradigm-border);
-      border-left: 4px solid var(--paradigm-accent);
-      border-radius: 4px;
+      --trend-line: var(--paradigm-accent);
+      --trend-line-center-y: 18px;
       color: var(--paradigm-ink);
       font-family: var(--font-serif);
       font-size: 0.82rem;
       font-weight: 600;
       letter-spacing: 0.01em;
       line-height: 1.3;
-      min-height: 24px;
+      min-height: 28px;
       overflow: visible !important;
-      box-shadow: inset 0 0 0 1px rgba(255, 252, 247, 0.4);
       cursor: pointer;
     }
 
     .vis-item.paradigm-range .vis-item-content {
-      position: absolute !important;
-      top: 0;
-      left: 0;
-      display: flex;
-      align-items: center;
-      width: max-content;
-      min-width: 0;
-      max-width: none;
-      min-height: 24px;
-      padding: 5px 10px;
+      position: static !important;
+      display: block;
+      width: 100%;
+      min-height: 28px;
+      height: 28px;
+      padding: 4px 6px;
       white-space: nowrap;
       overflow: visible;
-      transform: translateX(var(--paradigm-title-left, 0px)) !important;
+      z-index: 2;
+    }
+
+    .paradigm-title-text {
+      position: absolute;
+      top: -2px;
+      left: 6px;
+      white-space: nowrap;
+      transform: translateX(var(--paradigm-title-left, 0px));
       z-index: 2;
     }
 
@@ -689,22 +688,27 @@
       font-size: 1.8rem;
       min-height: 48px;
       overflow: visible !important;
-      background: var(--paradigm-export-fill) !important;
-      border: 1px solid var(--paradigm-export-border);
-      border-left: 4px solid var(--paradigm-accent);
-      border-radius: 4px;
+      background: transparent !important;
+      border: none !important;
       box-shadow: none;
     }
 
     .timeline-stage.is-exporting-image .vis-item.paradigm-range .vis-item-content {
       position: static !important;
-      display: flex;
-      align-items: center;
+      display: block;
       width: 100%;
       min-height: 48px;
-      padding: 6px 10px;
+      height: 48px;
+      padding: 0 20px;
       background-color: transparent !important;
       transform: none !important;
+    }
+
+    .timeline-stage.is-exporting-image .paradigm-title-text {
+      position: absolute;
+      bottom: calc(100% - var(--trend-line-center-y) + 6px);
+      left: 20px;
+      line-height: 1.1;
     }
 
     .timeline-stage.is-exporting-image .vis-item.paradigm-range .vis-item-overflow {
@@ -761,7 +765,8 @@
       color: #374151;
     }
 
-    .vis-item.trend-range {
+    .vis-item.trend-range,
+    .vis-item.paradigm-range {
       --trend-line-center-y: 18px;
       background: linear-gradient(var(--trend-line), var(--trend-line)) no-repeat center calc(var(--trend-line-center-y) - 1.25px) / 100% 2.5px,
                   transparent !important;
@@ -773,11 +778,13 @@
       transition: filter 0.15s ease, opacity 0.15s ease;
     }
 
-    .vis-item.trend-range:hover {
+    .vis-item.trend-range:hover,
+    .vis-item.paradigm-range:hover {
       filter: brightness(0.92) saturate(1.15);
     }
 
-    .timeline-stage.is-exporting-image .vis-item.trend-range {
+    .timeline-stage.is-exporting-image .vis-item.trend-range,
+    .timeline-stage.is-exporting-image .vis-item.paradigm-range {
       --trend-line-center-y: 36px;
       background-image: none !important;
       min-height: 48px !important;
@@ -796,6 +803,44 @@
       height: 2.5px;
       background-color: var(--trend-line);
       pointer-events: none;
+    }
+
+    .paradigm-export-start-dot,
+    .paradigm-export-arrowhead {
+      display: none;
+    }
+
+    .timeline-stage.is-exporting-image .vis-item.paradigm-range.dot-left::before,
+    .timeline-stage.is-exporting-image .vis-item.paradigm-range.arrow-right::after {
+      display: none !important;
+    }
+
+    .timeline-stage.is-exporting-image .paradigm-export-start-dot {
+      display: block;
+      position: absolute;
+      left: -5px;
+      top: var(--trend-line-center-y);
+      transform: translateY(-50%);
+      width: 7px;
+      height: 7px;
+      box-sizing: content-box;
+      border: 1px solid #d1d5db;
+      border-radius: 50%;
+      background-color: var(--trend-line);
+      z-index: 3;
+    }
+
+    .timeline-stage.is-exporting-image .paradigm-export-arrowhead {
+      display: block;
+      position: absolute;
+      right: -5px;
+      top: calc(var(--trend-line-center-y) - 5px);
+      width: 0;
+      height: 0;
+      border-top: 5px solid transparent;
+      border-bottom: 5px solid transparent;
+      border-left: 8px solid var(--trend-line);
+      z-index: 3;
     }
 
     .vis-item.trend-range .vis-item-content {
@@ -885,7 +930,8 @@
       box-shadow: inset 0 48px 48px -48px rgba(166, 124, 46, 0.06);
     }
 
-    .vis-item.trend-range.dot-left::before {
+    .vis-item.trend-range.dot-left::before,
+    .vis-item.paradigm-range.dot-left::before {
       content: "";
       position: absolute;
       left: -5px;
@@ -901,7 +947,8 @@
       z-index: 1;
     }
 
-    .vis-item.trend-range.arrow-right::after {
+    .vis-item.trend-range.arrow-right::after,
+    .vis-item.paradigm-range.arrow-right::after {
       content: "";
       position: absolute;
       right: -5px;
@@ -928,11 +975,13 @@
     }
 
     .timeline-stage.is-exporting-image.is-mobile-export .vis-item.trend-range.dot-left::before,
-    .timeline-stage.is-exporting-image.is-mobile-export .vis-item.trend-range.dot-right::after {
+    .timeline-stage.is-exporting-image.is-mobile-export .vis-item.trend-range.dot-right::after,
+    .timeline-stage.is-exporting-image.is-mobile-export .vis-item.paradigm-range.dot-left::before {
       top: var(--trend-line-center-y);
     }
 
-    .timeline-stage.is-exporting-image.is-mobile-export .vis-item.trend-range.arrow-right::after {
+    .timeline-stage.is-exporting-image.is-mobile-export .vis-item.trend-range.arrow-right::after,
+    .timeline-stage.is-exporting-image.is-mobile-export .vis-item.paradigm-range.arrow-right::after {
       top: calc(var(--trend-line-center-y) - 5px);
     }
 
