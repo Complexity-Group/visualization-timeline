@@ -2007,9 +2007,7 @@ async function exportTimelineAsJpeg() {
     el.adjustmentShell.style.height = (fullAdjustmentHeight + TIMELINE_CONTAINER_TOP_PADDING + ADJUSTMENT_CONTAINER_BOTTOM_PADDING) + "px";
 
     const exportStart = new Date(currentParadigmOptions.start);
-    const exactExportEnd = new Date(currentParadigmOptions.end);
-    const exportEnd = new Date(exactExportEnd);
-    exportEnd.setFullYear(exportEnd.getFullYear() + 10);
+    const exportEnd = new Date(currentParadigmOptions.end);
     activeExportWindow = { start: exportStart, end: exportEnd };
 
     trendTimelineInstance.setOptions({
