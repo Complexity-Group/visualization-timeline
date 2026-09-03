@@ -484,7 +484,7 @@
       width: 100%;
       overflow-y: auto;
       overflow-x: hidden;
-      scrollbar-gutter: stable;
+      scrollbar-gutter: auto;
       align-items: flex-start;
     }
 
