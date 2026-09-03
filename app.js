@@ -613,20 +613,34 @@ function calculateTimelineHeights(trendOptions) {
       : TREND_ROW_HEIGHT + TREND_TIME_AXIS_HEIGHT),
     TREND_ROW_HEIGHT
   );
+  const requiredParadigmHeight = Math.max(
+    Math.round(currentParadigmOptions && currentParadigmOptions.height
+      ? currentParadigmOptions.height
+      : SECONDARY_ROW_HEIGHT),
+    SECONDARY_ROW_HEIGHT
+  ) + paradigmRenderedHeightCorrection;
+  const requiredAdjustmentHeight = Math.max(
+    Math.round(currentAdjustmentOptions && currentAdjustmentOptions.height
+      ? currentAdjustmentOptions.height
+      : SECONDARY_ROW_HEIGHT),
+    SECONDARY_ROW_HEIGHT
+  );
+  const fixedShellHeight = requiredTrendHeight
+    + TIMELINE_CONTAINER_TOP_PADDING
+    + requiredParadigmHeight
+    + TIMELINE_CONTAINER_TOP_PADDING
+    + PARADIGM_CONTAINER_BOTTOM_PADDING
+    + TIMELINE_CONTAINER_TOP_PADDING
+    + ADJUSTMENT_CONTAINER_BOTTOM_PADDING;
+  const remainingAdjustmentHeight = Math.max(
+    Math.floor(getAvailableTimelineHeight() - fixedShellHeight),
+    0
+  );
+
   return {
     trendHeight: requiredTrendHeight,
-    paradigmHeight: Math.max(
-      Math.round(currentParadigmOptions && currentParadigmOptions.height
-        ? currentParadigmOptions.height
-        : SECONDARY_ROW_HEIGHT),
-      SECONDARY_ROW_HEIGHT
-    ) + paradigmRenderedHeightCorrection,
-    adjustmentHeight: Math.max(
-      Math.round(currentAdjustmentOptions && currentAdjustmentOptions.height
-        ? currentAdjustmentOptions.height
-        : SECONDARY_ROW_HEIGHT),
-      SECONDARY_ROW_HEIGHT
-    )
+    paradigmHeight: requiredParadigmHeight,
+    adjustmentHeight: Math.max(requiredAdjustmentHeight, remainingAdjustmentHeight)
   };
 }
 
@@ -823,6 +837,7 @@ function fitParadigmTimelineHeightToRenderedContent() {
   // Row-count estimates can be short by a few pixels per subgroup. Preserve
   // the measured correction for this tab so later resizes and export cleanup
   // cannot restore the clipped estimated height.
+  const previousAdjustmentHeight = calculateTimelineHeights(currentTrendOptions).adjustmentHeight;
   paradigmRenderedHeightCorrection += heightDeficit;
   const heights = calculateTimelineHeights(currentTrendOptions);
   lastAppliedTimelineHeights = heights.trendHeight + ":" + heights.paradigmHeight + ":" + heights.adjustmentHeight;
@@ -832,6 +847,13 @@ function fitParadigmTimelineHeightToRenderedContent() {
   });
   paradigmTimelineInstance.redraw();
   scrollTimelineToFirstRow(paradigmTimelineInstance, el.timelineBottom);
+  if (heights.adjustmentHeight !== previousAdjustmentHeight) {
+    adjustmentTimelineInstance.setOptions({
+      height: (heights.adjustmentHeight + TIMELINE_CONTAINER_TOP_PADDING + ADJUSTMENT_CONTAINER_BOTTOM_PADDING) + "px"
+    });
+    adjustmentTimelineInstance.redraw();
+    scrollTimelineToFirstRow(adjustmentTimelineInstance, el.timelineAdjustments);
+  }
   return true;
 }
 
