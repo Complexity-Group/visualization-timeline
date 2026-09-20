@@ -1,3 +1,2 @@
-# Timeline Widget
-
-This project provides a static, browser-based timeline widget of California's Energy Sources/Uses changes over time.
+# A timeline of California's energy sources and uses, governing dominant social paradigms, and paradigm modifications from the Indigenous era to the present
+A timeline that visualizes California’s historical development of energy sources and uses in relation to changing social paradigms (Figure ***). The tool utilizes Papa Parse to parse the underlying data from CSV files. The vis-timeline library visualizes the durations of individual entries and their associated historical events on a shared time scale. Users can switch between energy-sources and energy-uses views, zoom in and out across different periods, select timeline elements to explore related events, and export the chart as a JPEG image.
