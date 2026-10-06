@@ -1,6 +1,6 @@
 const TIMELINE_SHEET_NAME = "TIMELINE";
 const TIMELINE_REQUIRED_HEADERS = ["Title", "Start", "End", "Increment"];
-const DATA_REQUIRED_HEADERS = ["Start Yr", "Events", "Social Paradigms", "Adjustments"];
+const DATA_REQUIRED_HEADERS = ["Year", "Event", "Dominant Social Paradigm", "Adaptation"];
 
 function toInteger(value) {
   if (value == null || String(value).trim() === "") {
@@ -102,10 +102,10 @@ function parseTimelineSheet(workbook) {
 
 function parseDataSheet(workbook, sheetName) {
   const table = readSheetTable(workbook, sheetName, DATA_REQUIRED_HEADERS);
-  const yearIndex = table.columnIndex("Start Yr");
-  const eventIndex = table.columnIndex("Events");
-  const paradigmIndex = table.columnIndex("Social Paradigms");
-  const adjustmentIndex = table.columnIndex("Adjustments");
+  const yearIndex = table.columnIndex("Year");
+  const eventIndex = table.columnIndex("Event");
+  const paradigmIndex = table.columnIndex("Dominant Social Paradigm");
+  const adjustmentIndex = table.columnIndex("Adaptation");
   const events = [];
 
   for (let index = 0; index < table.rows.length; index += 1) {
